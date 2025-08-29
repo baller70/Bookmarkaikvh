@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Development BookAIMark Application
+  bookaimark-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: development
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+      - DATABASE_URL=postgresql://bookaimark:bookaimark_dev_password@postgres:5432/bookaimark
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - ./data:/app/data
+    depends_on:
+      - redis-dev
+      - postgres-dev
+    restart: unless-stopped
+    networks:
+      - bookaimark-dev-network
+    command: pnpm dev
+
+  # Redis for development
+  redis-dev:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    restart: unless-stopped
+    networks:
+      - bookaimark-dev-network
+
+  # PostgreSQL for development
+  postgres-dev:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=bookaimark
+      - POSTGRES_USER=bookaimark
+      - POSTGRES_PASSWORD=bookaimark_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./backend/database:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - bookaimark-dev-network
+
+  # Mailhog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    restart: unless-stopped
+    networks:
+      - bookaimark-dev-network
+
+volumes:
+  redis_dev_data:
+  postgres_dev_data:
+
+networks:
+  bookaimark-dev-network:
+    driver: bridge 

@@ -1,0 +1,138 @@
+config:
+  target: 'https://staging.bookaimark.com'
+  phases:
+    # Warm up phase
+    - duration: 60
+      arrivalRate: 1
+      name: "Warm up"
+    
+    # Ramp up phase
+    - duration: 120
+      arrivalRate: 1
+      rampTo: 10
+      name: "Ramp up load"
+    
+    # Sustained load phase
+    - duration: 300
+      arrivalRate: 10
+      name: "Sustained load"
+    
+    # Peak load phase
+    - duration: 120
+      arrivalRate: 10
+      rampTo: 25
+      name: "Peak load"
+    
+    # Cool down phase
+    - duration: 60
+      arrivalRate: 25
+      rampTo: 1
+      name: "Cool down"
+  
+  # Load testing configuration
+  http:
+    timeout: 30
+    pool: 10
+  
+  # Custom metrics
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+    
+  # Performance thresholds
+  ensure:
+    p95: 2000  # 95th percentile response time should be under 2 seconds
+    p99: 5000  # 99th percentile response time should be under 5 seconds
+    maxErrorRate: 5  # Error rate should be under 5%
+
+scenarios:
+  # Test main application pages
+  - name: "Browse main pages"
+    weight: 40
+    flow:
+      - get:
+          url: "/"
+          name: "Homepage"
+          
+      - think: 3
+      
+      - get:
+          url: "/dashboard"
+          name: "Dashboard"
+          
+      - think: 5
+      
+      - get:
+          url: "/api/health"
+          name: "Health check"
+          
+      - think: 2
+
+  # Test API endpoints
+  - name: "API endpoints"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/bookmarks"
+          name: "Get bookmarks"
+          qs:
+            user_id: "load-test-user"
+            
+      - think: 2
+      
+      - post:
+          url: "/api/bookmarks"
+          name: "Create bookmark"
+          json:
+            title: "Load Test Bookmark"
+            url: "https://example.com"
+            description: "Test bookmark for load testing"
+            user_id: "load-test-user"
+            
+      - think: 3
+      
+      - get:
+          url: "/api/analytics"
+          name: "Get analytics"
+          
+      - think: 2
+
+  # Test AI features
+  - name: "AI processing"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/ai/auto-processing"
+          name: "AI auto-processing"
+          json:
+            url: "https://example.com/article"
+            user_id: "load-test-user"
+            
+      - think: 10  # AI processing takes longer
+      
+      - get:
+          url: "/api/ai/recommendations"
+          name: "AI recommendations"
+          qs:
+            user_id: "load-test-user"
+            
+      - think: 3
+
+  # Test search functionality
+  - name: "Search features"
+    weight: 10
+    flow:
+      - get:
+          url: "/search"
+          name: "Search page"
+          
+      - think: 2
+      
+      - post:
+          url: "/api/search"
+          name: "Search bookmarks"
+          json:
+            query: "javascript"
+            user_id: "load-test-user"
+            
+      - think: 3 

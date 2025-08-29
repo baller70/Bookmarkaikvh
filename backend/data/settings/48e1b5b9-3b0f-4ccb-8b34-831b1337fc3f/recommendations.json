@@ -1,0 +1,10 @@
+{
+  "suggestionsPerRefresh": 8,
+  "serendipityLevel": 6,
+  "autoIncludeOnSelect": true,
+  "autoBundle": false,
+  "includeTLDR": true,
+  "domainBlacklist": [],
+  "revisitNudgeDays": 21,
+  "includeTrending": true
+}

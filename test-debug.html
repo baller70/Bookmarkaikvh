@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug AI Analysis Test</title>
+</head>
+<body>
+    <h1>Debug AI Analysis Test</h1>
+    
+    <h2>Test Content Extraction</h2>
+    <button onclick="testExtraction()">Test Content Extraction</button>
+    <div id="extractResult"></div>
+    
+    <h2>Test AI Analysis</h2>
+    <button onclick="testAnalysis()">Test AI Analysis</button>
+    <div id="analysisResult"></div>
+    
+    <script>
+        const BASE_URL = 'https://web-6pvjgbao7-kevin-houstons-projects.vercel.app';
+        
+        async function testExtraction() {
+            document.getElementById('extractResult').innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch(`${BASE_URL}/api/debug-extract`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: 'https://vercel.com'
+                    })
+                });
+                
+                const result = await response.json();
+                document.getElementById('extractResult').innerHTML = 
+                    `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+                    
+            } catch (error) {
+                document.getElementById('extractResult').innerHTML = 
+                    `Error: ${error.message}`;
+            }
+        }
+        
+        async function testAnalysis() {
+            document.getElementById('analysisResult').innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch(`${BASE_URL}/api/ai/debug-analysis`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: 'https://vercel.com'
+                    })
+                });
+                
+                const result = await response.json();
+                document.getElementById('analysisResult').innerHTML = 
+                    `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+                    
+            } catch (error) {
+                document.getElementById('analysisResult').innerHTML = 
+                    `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

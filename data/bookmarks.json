@@ -1,0 +1,111 @@
+[
+  {
+    "id": 1,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "GitHub",
+    "url": "https://github.com",
+    "description": "Git repository hosting service",
+    "category": "Development",
+    "tags": [
+      "code",
+      "git",
+      "development"
+    ],
+    "created_at": "2024-01-01T00:00:00.000Z",
+    "updated_at": "2024-01-01T00:00:00.000Z",
+    "notes": "Main development platform"
+  },
+  {
+    "id": 2,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Stack Overflow",
+    "url": "https://stackoverflow.com",
+    "description": "Programming Q&A community",
+    "category": "Development",
+    "tags": [
+      "programming",
+      "help",
+      "community"
+    ],
+    "created_at": "2024-01-02T00:00:00.000Z",
+    "updated_at": "2024-01-02T00:00:00.000Z",
+    "notes": "Best place for programming help"
+  },
+  {
+    "id": 3,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Figma",
+    "url": "https://figma.com",
+    "description": "Collaborative design tool",
+    "category": "Design",
+    "tags": [
+      "design",
+      "ui",
+      "collaboration"
+    ],
+    "created_at": "2024-01-03T00:00:00.000Z",
+    "updated_at": "2024-01-03T00:00:00.000Z",
+    "notes": "Primary design tool"
+  },
+  {
+    "id": 4,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Notion",
+    "url": "https://notion.so",
+    "description": "All-in-one workspace",
+    "category": "Productivity",
+    "tags": [
+      "notes",
+      "productivity",
+      "workspace"
+    ],
+    "created_at": "2024-01-04T00:00:00.000Z",
+    "updated_at": "2024-01-04T00:00:00.000Z",
+    "notes": "Project management and notes"
+  },
+  {
+    "id": 5,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "YouTube",
+    "url": "https://youtube.com",
+    "description": "Video sharing platform",
+    "category": "Entertainment",
+    "tags": [
+      "video",
+      "entertainment",
+      "learning"
+    ],
+    "created_at": "2024-01-05T00:00:00.000Z",
+    "updated_at": "2024-01-05T00:00:00.000Z",
+    "notes": "Video content and tutorials"
+  },
+  {
+    "id": 8,
+    "user_id": "dev-user-123",
+    "title": "Figma",
+    "url": "https://figma.com",
+    "description": "Collaborative design tool",
+    "category": "Design",
+    "tags": [
+      "design",
+      "ui",
+      "collaboration"
+    ],
+    "created_at": "2024-01-03T00:00:00.000Z",
+    "updated_at": "2024-01-03T00:00:00.000Z",
+    "notes": "Primary design tool"
+  },
+  {
+    "id": 12,
+    "user_id": "dev-user-123",
+    "title": "Rep",
+    "url": "https://replicate.com",
+    "description": "Bookmark saved from bulk uploader",
+    "category": "General",
+    "tags": [],
+    "ai_tags": [],
+    "notes": "",
+    "created_at": "2025-07-07T00:53:57.945Z",
+    "updated_at": "2025-07-07T00:53:57.948Z"
+  }
+]

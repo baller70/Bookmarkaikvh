@@ -1,0 +1,454 @@
+/* BookAIMark Extension Content Styles */
+
+/* Suggestion Overlay Styles */
+#bookaimark-suggestion-overlay {
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  width: 320px !important;
+  background: white !important;
+  border: 1px solid #e1e5e9 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+  z-index: 2147483647 !important; /* Maximum z-index */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+  font-size: 14px !important;
+  color: #1f2937 !important;
+  line-height: 1.5 !important;
+  animation: bookaimark-slideIn 0.3s ease-out !important;
+}
+
+@keyframes bookaimark-slideIn {
+  from {
+    transform: translateX(100%) !important;
+    opacity: 0 !important;
+  }
+  to {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+  }
+}
+
+#bookaimark-suggestion-overlay * {
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Toast Notification Styles */
+.bookaimark-toast {
+  position: fixed !important;
+  top: 20px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  background: #1f2937 !important;
+  color: white !important;
+  padding: 12px 24px !important;
+  border-radius: 8px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  z-index: 2147483647 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  animation: bookaimark-fadeIn 0.3s ease-out !important;
+  max-width: 400px !important;
+  text-align: center !important;
+}
+
+.bookaimark-toast.success {
+  background: #10b981 !important;
+}
+
+.bookaimark-toast.error {
+  background: #ef4444 !important;
+}
+
+.bookaimark-toast.info {
+  background: #3b82f6 !important;
+}
+
+@keyframes bookaimark-fadeIn {
+  from {
+    opacity: 0 !important;
+    transform: translateX(-50%) translateY(-10px) !important;
+  }
+  to {
+    opacity: 1 !important;
+    transform: translateX(-50%) translateY(0) !important;
+  }
+}
+
+/* Quick Search Overlay Styles */
+.bookaimark-search-backdrop {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: rgba(0, 0, 0, 0.6) !important;
+  z-index: 2147483646 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  animation: bookaimark-backdropFadeIn 0.2s ease-out !important;
+}
+
+@keyframes bookaimark-backdropFadeIn {
+  from {
+    opacity: 0 !important;
+  }
+  to {
+    opacity: 1 !important;
+  }
+}
+
+.bookaimark-search-modal {
+  background: white !important;
+  border-radius: 16px !important;
+  width: 90% !important;
+  max-width: 600px !important;
+  max-height: 80vh !important;
+  overflow: hidden !important;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25) !important;
+  animation: bookaimark-modalSlideIn 0.3s ease-out !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+@keyframes bookaimark-modalSlideIn {
+  from {
+    opacity: 0 !important;
+    transform: scale(0.9) translateY(-20px) !important;
+  }
+  to {
+    opacity: 1 !important;
+    transform: scale(1) translateY(0) !important;
+  }
+}
+
+.bookaimark-search-header {
+  padding: 24px !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  background: #f9fafb !important;
+}
+
+.bookaimark-search-header h3 {
+  margin: 0 !important;
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  color: #1f2937 !important;
+}
+
+.bookaimark-close-btn {
+  background: none !important;
+  border: none !important;
+  font-size: 28px !important;
+  cursor: pointer !important;
+  color: #6b7280 !important;
+  padding: 4px !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+.bookaimark-close-btn:hover {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+}
+
+.bookaimark-search-body {
+  padding: 24px !important;
+}
+
+.bookaimark-search-input {
+  width: 100% !important;
+  padding: 16px 20px !important;
+  border: 2px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  font-size: 16px !important;
+  outline: none !important;
+  transition: all 0.2s ease !important;
+  font-family: inherit !important;
+  background: white !important;
+  color: #1f2937 !important;
+}
+
+.bookaimark-search-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.bookaimark-search-input::placeholder {
+  color: #9ca3af !important;
+}
+
+.bookaimark-search-results {
+  margin-top: 20px !important;
+  max-height: 300px !important;
+  overflow-y: auto !important;
+  border-radius: 8px !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.bookaimark-search-result {
+  padding: 16px 20px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  background: white !important;
+}
+
+.bookaimark-search-result:last-child {
+  border-bottom: none !important;
+}
+
+.bookaimark-search-result:hover {
+  background: #f8fafc !important;
+  transform: translateX(4px) !important;
+}
+
+.bookaimark-result-title {
+  font-weight: 600 !important;
+  color: #1f2937 !important;
+  margin-bottom: 6px !important;
+  font-size: 15px !important;
+  line-height: 1.4 !important;
+}
+
+.bookaimark-result-url {
+  font-size: 13px !important;
+  color: #6b7280 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Duplicate Notification Styles */
+.bookaimark-duplicate-notification {
+  position: fixed !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  width: 320px !important;
+  background: #fef3c7 !important;
+  border: 1px solid #f59e0b !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  z-index: 2147483647 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  animation: bookaimark-slideUp 0.3s ease-out !important;
+}
+
+@keyframes bookaimark-slideUp {
+  from {
+    transform: translateY(100%) !important;
+    opacity: 0 !important;
+  }
+  to {
+    transform: translateY(0) !important;
+    opacity: 1 !important;
+  }
+}
+
+.bookaimark-duplicate-notification h4 {
+  margin: 0 0 8px 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #92400e !important;
+}
+
+.bookaimark-duplicate-notification p {
+  margin: 0 0 12px 0 !important;
+  font-size: 13px !important;
+  color: #a16207 !important;
+  line-height: 1.4 !important;
+}
+
+.bookaimark-duplicate-notification .actions {
+  display: flex !important;
+  gap: 8px !important;
+}
+
+.bookaimark-duplicate-notification button {
+  flex: 1 !important;
+  padding: 8px 12px !important;
+  border: none !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  font-family: inherit !important;
+}
+
+.bookaimark-duplicate-notification .primary-btn {
+  background: #f59e0b !important;
+  color: white !important;
+}
+
+.bookaimark-duplicate-notification .primary-btn:hover {
+  background: #d97706 !important;
+}
+
+.bookaimark-duplicate-notification .secondary-btn {
+  background: white !important;
+  color: #92400e !important;
+  border: 1px solid #f59e0b !important;
+}
+
+.bookaimark-duplicate-notification .secondary-btn:hover {
+  background: #fef3c7 !important;
+}
+
+/* Floating Action Button */
+.bookaimark-fab {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  width: 56px !important;
+  height: 56px !important;
+  background: #3b82f6 !important;
+  border: none !important;
+  border-radius: 50% !important;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4) !important;
+  cursor: pointer !important;
+  z-index: 2147483645 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.3s ease !important;
+  font-size: 24px !important;
+  color: white !important;
+}
+
+.bookaimark-fab:hover {
+  transform: scale(1.1) !important;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5) !important;
+}
+
+.bookaimark-fab:active {
+  transform: scale(0.95) !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  #bookaimark-suggestion-overlay {
+    width: calc(100% - 40px) !important;
+    max-width: 320px !important;
+    right: 20px !important;
+  }
+  
+  .bookaimark-search-modal {
+    width: 95% !important;
+    max-height: 90vh !important;
+  }
+  
+  .bookaimark-search-header {
+    padding: 20px !important;
+  }
+  
+  .bookaimark-search-body {
+    padding: 20px !important;
+  }
+  
+  .bookaimark-duplicate-notification {
+    width: calc(100% - 40px) !important;
+    max-width: 320px !important;
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  #bookaimark-suggestion-overlay {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #f9fafb !important;
+  }
+  
+  .bookaimark-search-modal {
+    background: #1f2937 !important;
+    color: #f9fafb !important;
+  }
+  
+  .bookaimark-search-header {
+    background: #111827 !important;
+    border-color: #374151 !important;
+  }
+  
+  .bookaimark-search-header h3 {
+    color: #f9fafb !important;
+  }
+  
+  .bookaimark-search-input {
+    background: #374151 !important;
+    border-color: #4b5563 !important;
+    color: #f9fafb !important;
+  }
+  
+  .bookaimark-search-input:focus {
+    border-color: #60a5fa !important;
+  }
+  
+  .bookaimark-search-results {
+    border-color: #374151 !important;
+  }
+  
+  .bookaimark-search-result {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+  }
+  
+  .bookaimark-search-result:hover {
+    background: #374151 !important;
+  }
+  
+  .bookaimark-result-title {
+    color: #f9fafb !important;
+  }
+  
+  .bookaimark-result-url {
+    color: #9ca3af !important;
+  }
+}
+
+/* Accessibility */
+.bookaimark-search-result:focus,
+.bookaimark-close-btn:focus,
+.bookaimark-search-input:focus {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  #bookaimark-suggestion-overlay {
+    border-width: 2px !important;
+  }
+  
+  .bookaimark-search-modal {
+    border: 2px solid #000 !important;
+  }
+  
+  .bookaimark-search-input {
+    border-width: 2px !important;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  #bookaimark-suggestion-overlay,
+  .bookaimark-toast,
+  .bookaimark-search-backdrop,
+  .bookaimark-search-modal,
+  .bookaimark-duplicate-notification,
+  .bookaimark-fab {
+    animation: none !important;
+    transition: none !important;
+  }
+} 

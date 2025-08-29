@@ -1,0 +1,93 @@
+import React from 'react';
+
+const Stub: React.FC = () => null;
+
+// Proxy so any named import returns Stub
+const proxy = new Proxy(Stub, {
+  get: () => Stub,
+});
+
+export default proxy as unknown as Record<string, React.FC>;
+
+// Additionally export common icons explicitly to satisfy tree-shaking static analysis
+export const History = Stub;
+export const Pause = Stub;
+export const AlertTriangle = Stub;
+export const CheckCircle = Stub;
+export const Eye = Stub;
+export const EyeOff = Stub;
+export const Plus = Stub;
+export const X = Stub;
+export const Search = Stub;
+export const Star = Stub;
+export const Clock = Stub;
+export const Settings = Stub;
+export const ChevronDown = Stub;
+export const ChevronUp = Stub;
+export const RotateCcw = Stub;
+export const Trash2 = Stub;
+export const Edit = Stub;
+export const AlertCircle = Stub;
+export const Info = Stub;
+export const HelpCircle = Stub;
+export const Tag = Stub;
+export const Folder = Stub;
+export const Download = Stub;
+export const Upload = Stub;
+export const ShieldCheck = Stub;
+export const Compass = Stub;
+export const Globe = Stub;
+export const ArrowLeft = Stub;
+export const Brain = Stub;
+export const BrainCircuit = Stub;
+export const Wrench = Stub;
+export const Mic = Stub;
+export const Play = Stub;
+export const Square = Stub;
+export const Headphones = Stub;
+export const Sparkles = Stub;
+export const Zap = Stub;
+export const Trash = Stub;
+export const Trash2Icon = Stub;
+export const DollarSign = Stub;
+export const CreditCard = Stub;
+export const ShoppingCart = Stub;
+export const EyeIcon = Stub;
+export const Heart = Stub;
+export const ExternalLink = Stub;
+export const Filter = Stub;
+export const TrendingUp = Stub;
+export const Grid = Stub;
+export const List = Stub;
+export const ChevronLeft = Stub;
+export const ChevronRight = Stub;
+export const GripVertical = Stub;
+export const FolderIcon = Stub;
+export const UploadIcon = Stub;
+export const Link = Stub;
+export const ThumbsUp = Stub;
+export const MessageCircle = Stub;
+export const SparklesIcon = Stub;
+export const ClockIcon = Stub;
+export const Bot = Stub;
+export const MessageSquare = Stub;
+export const Target = Stub;
+export const Shield = Stub;
+export const Code = Stub;
+export const Database = Stub;
+export const Image = Stub;
+export const Calendar = Stub;
+export const Mail = Stub;
+export const Calculator = Stub;
+export const PlusIcon = Stub;
+export const Waves = Stub;
+export const Palette = Stub;
+export const Volume2 = Stub;
+export const Circle = Stub;
+export const Check = Stub;
+export const ArrowRight = Stub;
+export const MoreHorizontal = Stub;
+export const PanelLeft = Stub;
+export const Minus = Stub;
+export const Sun = Stub;
+export const Moon = Stub; 

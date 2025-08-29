@@ -1,0 +1,61 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+.next
+dist
+build
+out
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Development files
+.vscode
+.idea
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cache
+.cache
+.turbo
+
+# Testing
+coverage
+.nyc_output
+
+# Temporary
+tmp
+temp
+
+# Documentation
+docs
+*.md
+!README.md
+
+# Scripts (exclude development scripts)
+scripts/dev-*
+scripts/test-*
+
+# Data files (use external storage in production)
+data/*.json
+!data/.gitkeep
+
+# Backend files not needed for frontend deployment
+backend/
+prisma/
+supabase/
+
+# Chrome extension
+chrome-extension/
+

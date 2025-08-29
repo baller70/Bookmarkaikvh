@@ -1,0 +1,31 @@
+{
+  "name": "bookaimark-extension",
+  "version": "2.0.0",
+  "description": "AI-powered bookmark management extension with smart categorization and real-time suggestions",
+  "main": "background.js",
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "package": "npm run build && zip -r bookaimark-extension.zip dist manifest.json icons",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "dependencies": {
+    "@types/chrome": "^0.0.268",
+    "typescript": "^5.3.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0"
+  },
+  "keywords": [
+    "chrome-extension",
+    "bookmarks",
+    "ai",
+    "categorization",
+    "productivity",
+    "browser-extension"
+  ],
+  "author": "BookAIMark Team",
+  "license": "MIT"
+} 

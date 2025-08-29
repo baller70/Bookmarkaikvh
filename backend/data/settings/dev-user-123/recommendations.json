@@ -1,0 +1,8 @@
+{
+  "suggestions_per_refresh": 7,
+  "serendipity_level": 8,
+  "include_trending": false,
+  "domain_blacklist": [
+    "example.com"
+  ]
+}

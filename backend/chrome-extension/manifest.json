@@ -1,0 +1,61 @@
+{
+  "manifest_version": 3,
+  "name": "BookAIMark - AI Bookmark Assistant",
+  "version": "2.0.0",
+  "description": "AI-powered bookmark management with smart categorization, real-time suggestions, and intelligent organization",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "storage",
+    "contextMenus",
+    "scripting",
+    "history",
+    "bookmarks"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://*.bookaimark.app/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "BookAIMark - AI Bookmark Assistant"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "commands": {
+    "save-bookmark": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "Save current page as bookmark with AI categorization"
+    },
+    "quick-search": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+F",
+        "mac": "Command+Shift+F"
+      },
+      "description": "Quick search bookmarks"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "*.css", "*.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+} 

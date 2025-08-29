@@ -1,0 +1,12 @@
+{
+  "suggestionsPerRefresh": 10,
+  "serendipityLevel": 9,
+  "autoIncludeOnSelect": false,
+  "autoBundle": true,
+  "includeTLDR": false,
+  "domainBlacklist": [
+    "spam.com"
+  ],
+  "revisitNudgeDays": 30,
+  "includeTrending": false
+}

@@ -1,0 +1,384 @@
+[
+  {
+    "id": 1,
+    "user_id": "dev-user-123",
+    "title": "File Storage Test",
+    "url": "https://example.com/file-test",
+    "description": "Testing file-based storage system",
+    "category": "Testing",
+    "tags": [
+      "Test",
+      "File Storage"
+    ],
+    "ai_summary": "Test bookmark using file storage",
+    "ai_tags": [],
+    "notes": "",
+    "created_at": "2025-07-04T09:56:38.822Z",
+    "updated_at": "2025-07-04T09:56:38.822Z"
+  },
+  {
+    "id": 2,
+    "user_id": "dev-user-123",
+    "title": "React Tutorial for Beginners",
+    "url": "https://react.dev/learn/tutorial",
+    "description": "Interactive React tutorial with step-by-step examples",
+    "category": "Development",
+    "tags": [
+      "React",
+      "Tutorial",
+      "Frontend",
+      "AI Recommended"
+    ],
+    "ai_summary": "Comprehensive React tutorial with hands-on examples",
+    "ai_tags": [
+      "React",
+      "Tutorial",
+      "Frontend"
+    ],
+    "ai_category": "Development",
+    "notes": "AI recommended based on your React interests",
+    "created_at": "2025-07-04T09:56:52.984Z",
+    "updated_at": "2025-07-04T09:56:52.984Z"
+  },
+  {
+    "id": 3,
+    "user_id": "dev-user-123",
+    "title": "Next.js Documentation",
+    "url": "https://nextjs.org/docs",
+    "description": "Complete guide to Next.js framework",
+    "category": "Development",
+    "tags": [
+      "Next.js",
+      "React",
+      "Framework",
+      "AI Recommended"
+    ],
+    "ai_summary": "Comprehensive Next.js documentation",
+    "ai_tags": [
+      "Next.js",
+      "React",
+      "Framework"
+    ],
+    "ai_category": "Development",
+    "notes": "AI recommended for Next.js development",
+    "created_at": "2025-07-04T09:57:44.685Z",
+    "updated_at": "2025-07-04T09:57:44.685Z"
+  },
+  {
+    "id": 4,
+    "user_id": "dev-user-123",
+    "title": "Tailwind CSS Documentation",
+    "url": "https://tailwindcss.com/docs",
+    "description": "Utility-first CSS framework documentation",
+    "category": "Design",
+    "tags": [
+      "CSS",
+      "Tailwind",
+      "Design",
+      "AI Recommended"
+    ],
+    "ai_summary": "Complete Tailwind CSS documentation",
+    "ai_tags": [
+      "CSS",
+      "Tailwind",
+      "Design"
+    ],
+    "ai_category": "Design",
+    "notes": "AI recommended for styling projects",
+    "created_at": "2025-07-04T09:57:44.685Z",
+    "updated_at": "2025-07-04T09:57:44.685Z"
+  },
+  {
+    "id": 5,
+    "user_id": "dev-user-123",
+    "title": "Node.js Best Practices for 2023",
+    "url": "https://nodejscentral.com/nodejs-2023-best-practices",
+    "description": "Stay ahead of the curve with these best practices for Node.js development.",
+    "category": "Development",
+    "tags": [
+      "Node",
+      "Medium Read",
+      "Highly Relevant",
+      "AI Recommended",
+      "Auto-Generated"
+    ],
+    "ai_summary": "Stay ahead of the curve with these best practices for Node.js development.",
+    "ai_tags": [],
+    "ai_category": "Development",
+    "notes": "AI Recommendation - 92% match\nReasons: Node.js is part of the user's interests, making this article highly relevant; Focuses on best practices, ensuring the user can apply the knowledge to improve their projects; The article's length fits within the user's preferred reading time window",
+    "created_at": "2025-07-04T09:59:46.853Z",
+    "updated_at": "2025-07-04T09:59:46.853Z"
+  },
+  {
+    "id": 13,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "MACHINE LEARNING FUNDAMENTALS",
+    "url": "https://mlbasics.com/fundamentals",
+    "description": "Learn the fundamentals of machine learning and AI",
+    "category": "AI/ML",
+    "tags": [
+      "Machine Learning",
+      "AI",
+      "Fundamentals"
+    ],
+    "ai_summary": "Fundamentals of machine learning and AI",
+    "ai_tags": [
+      "Machine Learning",
+      "AI",
+      "Fundamentals"
+    ],
+    "ai_category": "AI/ML",
+    "notes": "Introduction to AI and ML concepts",
+    "created_at": "2025-07-04T10:07:00.000Z",
+    "updated_at": "2025-07-04T10:07:00.000Z"
+  },
+  {
+    "id": 14,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "CYBERSECURITY ESSENTIALS",
+    "url": "https://cybersec.com/essentials",
+    "description": "Essential cybersecurity practices for developers",
+    "category": "Security",
+    "tags": [
+      "Security",
+      "Cybersecurity",
+      "Best Practices"
+    ],
+    "ai_summary": "Essential cybersecurity practices for developers",
+    "ai_tags": [
+      "Security",
+      "Cybersecurity",
+      "Best Practices"
+    ],
+    "ai_category": "Security",
+    "notes": "Critical security knowledge",
+    "created_at": "2025-07-04T10:08:00.000Z",
+    "updated_at": "2025-07-04T10:08:00.000Z"
+  },
+  {
+    "id": 15,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "CLOUD COMPUTING OVERVIEW",
+    "url": "https://cloud.com/overview",
+    "description": "Comprehensive overview of cloud computing technologies",
+    "category": "Cloud",
+    "tags": [
+      "Cloud",
+      "Computing",
+      "Technology"
+    ],
+    "ai_summary": "Comprehensive overview of cloud computing",
+    "ai_tags": [
+      "Cloud",
+      "Computing",
+      "Technology"
+    ],
+    "ai_category": "Cloud",
+    "notes": "Essential cloud computing knowledge",
+    "created_at": "2025-07-04T10:09:00.000Z",
+    "updated_at": "2025-07-04T10:09:00.000Z"
+  },
+  {
+    "id": 16,
+    "user_id": "dev-user-123",
+    "title": "Top AI & ML Trends in 2023: What Developers Need to Know",
+    "url": "https://futuretech.com/ai-ml-trends",
+    "description": "Stay ahead of the curve with this overview of the top AI and ML trends for 2023. Discover how these trends are shaping the future of development.",
+    "category": "AI/ML",
+    "tags": [
+      "Ai",
+      "Ml",
+      "Api",
+      "Medium Read",
+      "Relevant",
+      "AI Recommended",
+      "Auto-Generated"
+    ],
+    "ai_summary": "Stay ahead of the curve with this overview of the top AI and ML trends for 2023. Discover how these trends are shaping the future of development.",
+    "ai_tags": [
+      "Ai",
+      "Ml"
+    ],
+    "ai_category": "AI/ML",
+    "notes": "AI Recommendation - 88% match\nReasons: Aligns with user's interest in AI/ML, providing insights into future trends.; Content is tailored for developers, making it highly relevant to the user's profession.; Short read time fits within the user's preference, making it likely they'll engage with the content.",
+    "created_at": "2025-07-04T10:11:25.404Z",
+    "updated_at": "2025-07-04T10:11:25.404Z"
+  },
+  {
+    "id": 17,
+    "user_id": "dev-user-123",
+    "title": "The Future of Web Development: Trends to Watch in 2023",
+    "url": "https://futureweb.com/trends-2023",
+    "description": "Stay ahead of the curve with these emerging trends in web development, from AI integration to new JavaScript frameworks.",
+    "category": "AI/ML",
+    "tags": [
+      "Javascript",
+      "Ai",
+      "Medium Read",
+      "Highly Relevant",
+      "AI Recommended",
+      "Auto-Generated"
+    ],
+    "ai_summary": "Stay ahead of the curve with these emerging trends in web development, from AI integration to new JavaScript frameworks.",
+    "ai_tags": [
+      "Development",
+      "Ai"
+    ],
+    "ai_category": "AI/ML",
+    "notes": "AI Recommendation - 91% match\nReasons: Covers emerging trends in web development, aligning with the user's professional interests; Includes information on AI integration into web projects, bridging two of the user's interests; Optimal read time for a comprehensive overview without being too lengthy",
+    "created_at": "2025-07-04T10:14:44.187Z",
+    "updated_at": "2025-07-04T10:14:44.187Z"
+  },
+  {
+    "id": 18,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "The Top Frontend Frameworks to Watch in 2023",
+    "url": "https://webdevtrends.com/frontend-frameworks-2023",
+    "description": "Stay ahead of the curve with our roundup of the top frontend frameworks for 2023. Whether you're a React enthusiast or looking to explore new options, find out which frameworks are leading the way.",
+    "category": "Development",
+    "tags": [
+      "React",
+      "Medium Read",
+      "Relevant",
+      "AI Recommended",
+      "Auto-Generated"
+    ],
+    "ai_summary": "Stay ahead of the curve with our roundup of the top frontend frameworks for 2023. Whether you're a React enthusiast or looking to explore new options, find out which frameworks are leading the way.",
+    "ai_tags": [
+      "Development"
+    ],
+    "ai_category": "Development",
+    "notes": "AI Recommendation - 87% match\nReasons: Relevant to user's interest in frontend frameworks and web development trends; Helps users stay informed on potential technologies to learn next; Concise read time aligns with user preferences",
+    "created_at": "2025-07-04T10:19:28.489Z",
+    "updated_at": "2025-07-04T10:19:28.489Z"
+  },
+  {
+    "id": 19,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Introduction to Node.js: A Beginner's Guide",
+    "url": "https://nodejs.dev/learn/intro-to-nodejs",
+    "description": "This guide offers a comprehensive introduction to Node.js, covering its basics, and how to get started with building applications.",
+    "category": "Development",
+    "tags": [
+      "Node",
+      "Medium Read",
+      "Relevant",
+      "AI Recommended",
+      "Auto-Generated"
+    ],
+    "ai_summary": "This guide offers a comprehensive introduction to Node.js, covering its basics, and how to get started with building applications.",
+    "ai_tags": [
+      "Development"
+    ],
+    "ai_category": "Development",
+    "notes": "AI Recommendation - 88% match\nReasons: Node.js is a key interest, and this article provides a solid foundation for beginners; Supports the user's web development interests by covering backend technologies; The article's length fits within the user's preferred reading time window",
+    "created_at": "2025-07-04T10:20:48.523Z",
+    "updated_at": "2025-07-04T10:20:48.523Z"
+  },
+  {
+    "id": 20,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "example.com",
+    "url": "https://example.com/test-link",
+    "description": "web resource - ",
+    "category": "General",
+    "tags": [],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [],
+    "notes": "",
+    "created_at": "2025-07-04T10:45:44.357Z",
+    "updated_at": "2025-07-04T10:45:44.357Z"
+  },
+  {
+    "id": 21,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "github.com",
+    "url": "https://github.com/example/test-repo",
+    "description": "repo resource - development, code, repository, github, open-source",
+    "category": "code_repositories",
+    "tags": [
+      "development",
+      "code",
+      "repository",
+      "github",
+      "open-source"
+    ],
+    "ai_summary": "Auto-categorized repo resource",
+    "ai_tags": [
+      "development",
+      "code",
+      "repository",
+      "github",
+      "open-source"
+    ],
+    "notes": "",
+    "created_at": "2025-07-04T10:45:44.357Z",
+    "updated_at": "2025-07-04T10:45:44.357Z"
+  },
+  {
+    "id": 22,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Home | TBF Skillz",
+    "url": "https://tbfskillz.com/",
+    "description": "PRO SKILL DEVELOPMENT PRODUCTS",
+    "category": "Gaming",
+    "tags": [
+      "gaming",
+      "skills",
+      "community"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "gaming",
+      "skills",
+      "community"
+    ],
+    "notes": "PRO SKILL DEVELOPMENT PRODUCTS",
+    "created_at": "2025-07-04T10:47:29.692Z",
+    "updated_at": "2025-07-04T10:47:29.692Z"
+  },
+  {
+    "id": 23,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Elite Basketball Training in Sparta, NJ | The Basketball Factory Inc",
+    "url": "https://thebasketballfactoryinc.com/",
+    "description": "web resource - basketball, training, sports",
+    "category": "Basketball Training",
+    "tags": [
+      "basketball",
+      "training",
+      "sports"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "basketball",
+      "training",
+      "sports"
+    ],
+    "notes": "",
+    "created_at": "2025-07-04T10:47:29.693Z",
+    "updated_at": "2025-07-04T10:47:29.693Z"
+  },
+  {
+    "id": 24,
+    "user_id": "48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f",
+    "title": "Rise as One AAU Basketball &#8211; One Team One Rise",
+    "url": "https://riseasoneaau.com/",
+    "description": "web resource - community, events, education",
+    "category": "Organizations",
+    "tags": [
+      "community",
+      "events",
+      "education"
+    ],
+    "ai_summary": "Auto-categorized web resource",
+    "ai_tags": [
+      "community",
+      "events",
+      "education"
+    ],
+    "notes": "",
+    "created_at": "2025-07-04T10:47:29.693Z",
+    "updated_at": "2025-07-04T10:47:29.693Z"
+  }
+]
