@@ -2,9 +2,9 @@ import { createClient } from '@supabase/supabase-js'
 import { Database } from '@/types/supabase'
 import { appLogger } from '@/lib/logger'
 
-// Get environment variables with fallbacks for development
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://localhost-placeholder.supabase.co'
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
+// Get environment variables with fallbacks for development - TRIM to remove newlines!
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://localhost-placeholder.supabase.co').trim()
+const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key').trim()
 
 // Only throw errors in production or if explicitly required
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NODE_ENV === 'production') {

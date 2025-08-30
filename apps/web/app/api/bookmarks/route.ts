@@ -9,8 +9,8 @@ import { createClient } from '@supabase/supabase-js';
 // Storage configuration - Supabase first, file fallback for development/testing
 const BOOKMARKS_FILE = join(process.cwd(), 'data', 'bookmarks.json');
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim()
 
 const USE_SUPABASE = !!(
   supabaseUrl && 
