@@ -8,7 +8,7 @@ const USE_SUPABASE = !!(
   supabaseKey &&
   !supabaseUrl.includes('placeholder') &&
   !supabaseKey.includes('placeholder') &&
-  !supabaseKey.includes('dev-placeholder')
+  !supabaseKey.includes('dev-placeholder-service-key')
 )
 const supabase = USE_SUPABASE ? createClient(supabaseUrl!, supabaseKey!) : null
 
