@@ -278,15 +278,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const authResult = await authenticateUser(request);
-    if (!authResult.success) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status || 401 }
-      );
-    }
-    
-    const userId = authResult.userId!;
+    // Per user instruction, always use the bypass ID for testing (same as GET).
+    const userId = '00000000-0000-0000-0000-000000000001';
+    console.log(`[API OVERRIDE] Forcing userId to dev bypass: ${userId}`);
     const body = await request.json();
     let { id, title, url, description, category, tags, ai_summary, ai_tags, ai_category, notes, customBackground, relatedBookmarks, enableAI = true } = body;
     
@@ -535,14 +529,9 @@ export async function DELETE(request: NextRequest) {
       );
     }
     
-    const authResult = await authenticateUser(request);
-    if (!authResult.success) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
-      );
-    }
-    const userId = authResult.userId!;
+    // Per user instruction, always use the bypass ID for testing (same as GET).
+    const userId = '00000000-0000-0000-0000-000000000001';
+    console.log(`[API OVERRIDE] Forcing userId to dev bypass: ${userId}`);
     
     console.log(`🗑️ Deleting bookmark ${bookmarkId} for user ${userId}`);
     
