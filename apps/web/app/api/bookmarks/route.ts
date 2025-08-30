@@ -8,18 +8,22 @@ import { createClient } from '@supabase/supabase-js';
 
 // Storage configuration - Supabase first, file fallback for development/testing
 const BOOKMARKS_FILE = join(process.cwd(), 'data', 'bookmarks.json');
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
 const USE_SUPABASE = !!(
-  process.env.NEXT_PUBLIC_SUPABASE_URL && 
-  process.env.SUPABASE_SERVICE_ROLE_KEY &&
-  !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder') &&
-  !process.env.SUPABASE_SERVICE_ROLE_KEY.includes('placeholder')
+  supabaseUrl && 
+  supabaseKey &&
+  !supabaseUrl.includes('placeholder') &&
+  !supabaseKey.includes('placeholder')
 );
 const USE_FILES_FALLBACK = !USE_SUPABASE;
 
 // Initialize Supabase client
 const supabase = USE_SUPABASE ? createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  supabaseUrl!,
+  supabaseKey!
 ) : null;
 
 console.log('🔧 Storage Configuration:');
