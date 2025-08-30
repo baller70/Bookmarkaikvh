@@ -40,7 +40,12 @@ export async function GET(_request: NextRequest) {
         .from('bookmark_analytics')
         .select('weeklyVisits, week_start')
       if (weekErr) throw weekErr
-      const thisWeekVisits = (weekRows || []).reduce((sum: number, r: any) => sum + ((r.week_start === mondayISO ? (r.weeklyVisits || 0) : 0)), 0)
+      const thisWeekVisits = (weekRows || []).reduce((sum: number, r: any) => {
+        // Compare dates properly (handle different string formats)
+        const isThisWeek = r.week_start && 
+          new Date(r.week_start).getTime() === new Date(mondayISO).getTime();
+        return sum + (isThisWeek ? (r.weeklyVisits || 0) : 0);
+      }, 0)
 
       // Broken count from bookmarks table
       const { count: brokenCount, error: brokenErr } = await supabase

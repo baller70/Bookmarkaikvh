@@ -162,7 +162,11 @@ export async function POST(request: NextRequest) {
         const weekStartISO = getUtcMondayStartISO(now);
         const storedWeekStart = (analytics as any)?.week_start || null;
         const currentWeekly = (analytics as any)?.weeklyVisits ?? (analytics as any)?.weeklyvisits ?? 0
-        if (!storedWeekStart || storedWeekStart !== weekStartISO) {
+        // Normalize both dates to compare properly (handle timezone differences)
+        const isNewWeek = !storedWeekStart || 
+          new Date(storedWeekStart).getTime() !== new Date(weekStartISO).getTime();
+        
+        if (isNewWeek) {
           updateData.week_start = weekStartISO;
           updateData.weeklyVisits = 1;
         } else {
@@ -183,6 +187,7 @@ export async function POST(request: NextRequest) {
     const buildPayload = () => {
       const payload: any = { ...updateData }
       if (updateData.weeklyVisits !== undefined) payload.weeklyvisits = updateData.weeklyVisits
+      if (updateData.week_start !== undefined) payload.week_start = updateData.week_start
 
       // sessionCount removed - was causing DB errors
       // if (updateData.sessionCount !== undefined) payload.sessioncount = updateData.sessionCount
