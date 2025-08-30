@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadBookmarks, saveBookmarks } from '@/lib/file-storage'
+import { createClient } from '@supabase/supabase-js'
 
 export type HealthStatus = 'excellent' | 'working' | 'fair' | 'poor' | 'broken'
 
@@ -81,17 +82,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'bookmarkIds array is required' }, { status: 400 })
     }
 
-    // Load bookmarks
-    const allBookmarks = await loadBookmarks()
-    const userBookmarks = allBookmarks.filter(bookmark => 
-      bookmark.user_id === 'dev-user-fixed-id'
-    )
+    // Prefer Supabase bookmarks when configured; fallback to file in dev
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const useSupabase = !!(supabaseUrl && supabaseKey)
+
+    let userBookmarks: any[] = []
+    if (useSupabase) {
+      const supabase = createClient(supabaseUrl!, supabaseKey!)
+      const { data, error } = await supabase.from('bookmarks').select('id, url, title, site_health')
+      if (error) throw error
+      userBookmarks = data || []
+    } else {
+      const allBookmarks = await loadBookmarks()
+      userBookmarks = allBookmarks
+    }
 
     const results: HealthCheckResult[] = []
     
     // Check health for each requested bookmark
     for (const bookmarkId of bookmarkIds) {
-      const bookmark = userBookmarks.find(b => b.id === bookmarkId)
+      const bookmark = userBookmarks.find(b => String(b.id) === String(bookmarkId))
       if (!bookmark) {
         results.push({
           bookmarkId,
@@ -102,7 +113,7 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      console.log(`🔍 Checking health for: ${bookmark.title} (${bookmark.url})`)
+      console.log(`🔍 Checking health for: ${bookmark.title || ''} (${bookmark.url})`)
       const healthResult = await checkUrlHealth(bookmark.url)
       
       results.push({
@@ -111,15 +122,36 @@ export async function POST(request: NextRequest) {
         lastChecked: new Date().toISOString()
       })
 
-      // Update bookmark with new health status and increment health check count
-      const bookmarkIndex = allBookmarks.findIndex(b => b.id === bookmarkId)
-      if (bookmarkIndex !== -1) {
-        const currentBookmark = allBookmarks[bookmarkIndex]
-        allBookmarks[bookmarkIndex] = {
-          ...currentBookmark,
-          site_health: healthResult.status,
-          last_health_check: new Date().toISOString(),
-          healthCheckCount: (currentBookmark.healthCheckCount || 0) + 1
+      if (useSupabase) {
+        const supabase = createClient(supabaseUrl!, supabaseKey!)
+        try {
+          const res = await supabase
+            .from('bookmarks')
+            .update({
+              site_health: healthResult.status,
+              last_health_check: new Date().toISOString()
+            })
+            .eq('id', bookmarkId)
+          if ((res as any).error && (res as any).error.code !== '42703') {
+            throw (res as any).error
+          }
+          // If 42703 (column missing), continue gracefully – UI will still show result
+        } catch (e: any) {
+          if (!e?.code || e.code !== '42703') throw e
+        }
+      } else {
+        // Update bookmark with new health status and increment health check count in file fallback
+        const allBookmarks = await loadBookmarks()
+        const bookmarkIndex = allBookmarks.findIndex(b => String(b.id) === String(bookmarkId))
+        if (bookmarkIndex !== -1) {
+          const currentBookmark = allBookmarks[bookmarkIndex]
+          allBookmarks[bookmarkIndex] = {
+            ...currentBookmark,
+            site_health: healthResult.status,
+            last_health_check: new Date().toISOString(),
+            healthCheckCount: (currentBookmark.healthCheckCount || 0) + 1
+          }
+          await saveBookmarks(allBookmarks)
         }
       }
     }

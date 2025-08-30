@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
       const { data: userBookmarks, error } = await supabase
         .from('bookmarks')
         .select('*')
-        .eq('user_id', userId)
+        .or(`user_id.eq.${userId},user_id.is.null`)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -377,9 +377,9 @@ export async function POST(request: NextRequest) {
         }
 
         // Only use columns that actually exist in the Supabase bookmarks table
-        // Setting user_id to null to avoid foreign key constraint with profiles table
+        // Store under the dev/testing user so reads include it
         const insertPayload = {
-          user_id: null,
+          user_id: userId,
           title,
           url,
           description: description || ai.summary || '',
@@ -391,19 +391,61 @@ export async function POST(request: NextRequest) {
           folder_id: null
         };
 
-        const { data, error } = await supabase
+        let insertResult = await supabase
           .from('bookmarks')
           .insert(insertPayload)
           .select('*')
           .single();
 
-        if (error) {
-          console.error('❌ Supabase insert error:', error);
-          return NextResponse.json({ error: 'Failed to create bookmark', details: error.message }, { status: 500 });
+        if (insertResult.error) {
+          console.error('❌ Supabase insert error:', insertResult.error);
+
+          // If foreign key error due to missing profile, try to seed the dev profile and retry once
+          if (insertResult.error.code === '23503' && insertResult.error.message?.includes('bookmarks_user_id_fkey')) {
+            console.log('🧩 Seeding dev profile row to satisfy FK, then retrying insert...');
+            try {
+              const seed = await supabase
+                .from('profiles')
+                .insert({ id: userId })
+                .select('id')
+                .single();
+              if (seed.error && seed.error.code !== '23505') {
+                console.warn('⚠️ Profile seed failed:', seed.error.message);
+              } else {
+                console.log('✅ Profile seed ensured for user:', userId);
+              }
+            } catch (e) {
+              console.warn('⚠️ Profile seed threw exception:', (e as Error).message);
+            }
+
+            // Retry bookmark insert once
+            insertResult = await supabase
+              .from('bookmarks')
+              .insert(insertPayload)
+              .select('*')
+              .single();
+          }
         }
 
-        console.log('✅ Successfully created bookmark (Supabase):', data);
-        return NextResponse.json({ success: true, bookmark: data, message: 'Bookmark created successfully' });
+        if (insertResult.error) {
+          // As a last-resort dev fallback, insert without user_id to avoid FK (local only)
+          if (insertResult.error.code === '23503') {
+            const fallbackPayload = { ...insertPayload, user_id: null as any }
+            const retryNoUser = await supabase
+              .from('bookmarks')
+              .insert(fallbackPayload)
+              .select('*')
+              .single()
+            if (!retryNoUser.error) {
+              console.log('✅ Created bookmark with null user_id (dev fallback):', retryNoUser.data)
+              return NextResponse.json({ success: true, bookmark: retryNoUser.data, message: 'Bookmark created successfully' })
+            }
+          }
+          return NextResponse.json({ error: 'Failed to create bookmark', details: insertResult.error.message }, { status: 500 });
+        }
+
+        console.log('✅ Successfully created bookmark (Supabase):', insertResult.data);
+        return NextResponse.json({ success: true, bookmark: insertResult.data, message: 'Bookmark created successfully' });
       }
     } else if (USE_FILES_FALLBACK) {
       // File fallback for development only

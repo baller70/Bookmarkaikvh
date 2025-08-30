@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { writeFile, mkdir } from 'fs/promises'
+import { existsSync } from 'fs'
+import { join } from 'path'
 
 // POST /api/user-data/upload - Upload file to Supabase storage and save metadata
 export async function POST(request: NextRequest) {
@@ -32,14 +35,57 @@ const getSupabaseClient = () => {
     }
 
     // Validate file type and size
-    const maxSize = 50 * 1024 * 1024; // 50MB
-    if (file.size > maxSize) {
-      return NextResponse.json({ error: 'File size too large (max 50MB)', success: false }, { status: 400 });
-    }
+    const supabaseMaxSize = 50 * 1024 * 1024; // 50MB to Supabase
 
     // Generate unique filename
     const fileExtension = file.name.split('.').pop();
     const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExtension}`;
+
+    // If file is larger than Supabase threshold, save locally under public/user-media
+    if (file.size > supabaseMaxSize) {
+      const publicDir = join(process.cwd(), 'public', 'user-media', user.id, type)
+      if (!existsSync(publicDir)) {
+        await mkdir(publicDir, { recursive: true })
+      }
+      const localPath = join(publicDir, uniqueFileName)
+      const arrayBuffer = await file.arrayBuffer()
+      await writeFile(localPath, Buffer.from(arrayBuffer))
+
+      const publicUrl = `/user-media/${user.id}/${type}/${uniqueFileName}`
+
+      const mediaFileData = {
+        user_id: user.id,
+        name: file.name,
+        type: type as 'image' | 'video' | 'document' | 'logo',
+        url: publicUrl,
+        size: file.size,
+        mime_type: file.type,
+        tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
+        metadata: {
+          original_name: file.name,
+          upload_path: localPath,
+          file_extension: fileExtension,
+          storage: 'local'
+        }
+      };
+
+      const { data: mediaFile, error: dbError } = await supabase
+        .from('user_media_files')
+        .insert(mediaFileData)
+        .select()
+        .single();
+
+      if (dbError) {
+        return NextResponse.json({ error: 'Failed to save file metadata', success: false }, { status: 500 });
+      }
+
+      return NextResponse.json({ 
+        data: mediaFile, 
+        success: true,
+        message: 'File saved locally due to large size'
+      }, { status: 201 });
+    }
+
     const filePath = `${user.id}/${type}/${uniqueFileName}`;
 
     // Convert file to buffer
@@ -76,7 +122,8 @@ const getSupabaseClient = () => {
       metadata: {
         original_name: file.name,
         upload_path: filePath,
-        file_extension: fileExtension
+        file_extension: fileExtension,
+        storage: 'supabase'
       }
     };
 

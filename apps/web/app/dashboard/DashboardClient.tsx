@@ -313,14 +313,6 @@ export default function Dashboard() {
     console.log('🌐 Is Browser:', isBrowser);
     console.log('🔧 Component version: LATEST WITH DEBUG');
     
-    // Test analytics tracking with some bookmarks
-    if (trackVisit) {
-      console.log('🔥 Testing analytics tracking...');
-      setTimeout(() => {
-        trackVisit('303'); // Track visit to bookmark 303
-        trackVisit('304'); // Track visit to bookmark 304
-      }, 2000);
-    }
   }, []); // Run once after mount
   
   // State management
@@ -438,7 +430,97 @@ export default function Dashboard() {
   const userId = 'dev-user-123';
 
   // Real-time analytics
-  const { analyticsData, globalStats, isLoading: analyticsLoading, trackVisit, trackTimeSpent, getBookmarkAnalytics } = useAnalytics(bookmarks);
+  const { analyticsData, globalStats, isLoading: analyticsLoading, trackVisit: trackVisitGlobal, trackTimeSpent: trackTimeSpentGlobal, getBookmarkAnalytics, refreshAnalytics: refreshGlobalAnalytics } = useAnalytics(bookmarks);
+  
+  // Dedicated analytics for the selected bookmark to prevent global state interference
+  const {
+    analyticsData: selectedBookmarkAnalyticsData,
+    isLoading: selectedBookmarkAnalyticsLoading,
+    trackVisit: trackSelectedBookmarkVisit,
+    trackTimeSpent: trackSelectedBookmarkTimeSpent,
+    getBookmarkAnalytics: getSelectedBookmarkAnalytics,
+    refreshAnalytics: refreshSelectedBookmarkAnalytics,
+  } = useAnalytics(selectedBookmark?.id);
+
+  // Combined tracking functions that update both global and selected bookmark analytics
+  const trackVisitCombined = async (bookmarkId: string) => {
+    // Track on the dedicated instance first (for immediate UI updates)
+    await trackSelectedBookmarkVisit(bookmarkId);
+    
+    // Update direct cache immediately for instant UI updates
+    setDirectAnalyticsCache(prev => ({
+      ...prev,
+      [bookmarkId]: {
+        visits: (prev[bookmarkId]?.visits || 0) + 1,
+        timeSpent: prev[bookmarkId]?.timeSpent || 0
+      }
+    }));
+    
+    // Refresh global analytics to keep front cards in sync
+    setTimeout(() => {
+      refreshGlobalAnalytics();
+      fetchDirectAnalytics(bookmarkId); // Refresh direct cache with server data
+    }, 500);
+  };
+
+  const trackTimeSpentCombined = async (bookmarkId: string, timeSpent: number) => {
+    // Track on the dedicated instance first
+    await trackSelectedBookmarkTimeSpent(bookmarkId, timeSpent);
+    
+    // Refresh global analytics to keep front cards in sync
+    setTimeout(() => {
+      refreshGlobalAnalytics();
+    }, 500);
+  };
+
+  // Direct analytics cache to bypass complex hook logic
+  const [directAnalyticsCache, setDirectAnalyticsCache] = useState<{[key: string]: {visits: number, timeSpent: number}}>({});
+  
+  // Fetch analytics directly for a bookmark and cache it
+  const fetchDirectAnalytics = async (bookmarkId: string) => {
+    try {
+      const response = await fetch(`/api/bookmarks/analytics?bookmarkId=${bookmarkId}`);
+      const result = await response.json();
+      if (result.success) {
+        const cacheData = {
+          visits: result.data.visits || 0,
+          timeSpent: result.data.timeSpent || 0
+        };
+        setDirectAnalyticsCache(prev => ({
+          ...prev,
+          [bookmarkId]: cacheData
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch direct analytics:', error);
+    }
+  };
+  
+  // Load direct analytics for all bookmarks when they change
+  useEffect(() => {
+    bookmarks.forEach(bookmark => {
+      if (!directAnalyticsCache[bookmark.id]) {
+        fetchDirectAnalytics(bookmark.id);
+      }
+    });
+  }, [bookmarks]);
+  
+  // Unified analytics getter that prioritizes dedicated instance data
+  const getUnifiedBookmarkAnalytics = (bookmarkId: string) => {
+    // If this is the selected bookmark, use the dedicated instance (most up-to-date)
+    if (selectedBookmark?.id === bookmarkId) {
+      return getSelectedBookmarkAnalytics(bookmarkId);
+    }
+    
+    // Otherwise, try direct cache first, then global instance
+    const directData = directAnalyticsCache[bookmarkId];
+    if (directData) {
+      return directData;
+    }
+    
+    // Fallback to global instance
+    return getBookmarkAnalytics(bookmarkId);
+  };
 
   // Health check loading state for individual bookmarks
   const [healthCheckLoading, setHealthCheckLoading] = useState<{ [key: string]: boolean }>({});
@@ -451,6 +533,22 @@ export default function Dashboard() {
   // Username state
   const [username, setUsername] = useState('TOM');
   
+  // Analytics summary polling for top cards
+  const [summary, setSummary] = useState<{ totalVisits: number; totalTimeSpentMinutes: number; thisWeekVisits?: number; brokenCount?: number } | null>(null)
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      try {
+        const res = await fetch('/api/analytics/summary')
+        const json = await res.json()
+        if (active && json && !json.error) setSummary(json)
+      } catch {}
+    }
+    load()
+    const id = setInterval(load, 30000)
+    return () => { active = false; clearInterval(id) }
+  }, [])
+
   // Analytics metrics state
   const [selectedMetrics, setSelectedMetrics] = useState(['Total Visits', 'Engagement Score']);
   const [isMetricsDropdownOpen, setIsMetricsDropdownOpen] = useState(false);
@@ -576,7 +674,7 @@ export default function Dashboard() {
       try {
         setIsLoadingBookmarks(true);
         console.log('🔍 Fetching bookmarks for user ID:', userId);
-        const response = await fetch(`/api/bookmarks?user_id=${userId}`);
+        const response = await fetch(`/api/bookmarks`);
         const data = await response.json();
         
         console.log('📡 API Response:', data);
@@ -1085,7 +1183,6 @@ export default function Dashboard() {
             <p className="mt-4 text-lg text-gray-600">Loading your bookmarks...</p>
             <p className="mt-2 text-sm text-gray-500">Debug: Loading state = {isLoadingBookmarks ? 'true' : 'false'}</p>
             <p className="mt-1 text-sm text-gray-500">Debug: Bookmarks count = {bookmarks.length}</p>
-            <p className="mt-1 text-sm text-gray-500">Debug: Environment = {typeof window !== 'undefined' ? 'client' : 'server'}</p>
           </div>
         </div>
       </div>
@@ -1404,11 +1501,16 @@ export default function Dashboard() {
   }
 
   const handleBookmarkClick = (bookmark: any) => {
-    // Increment analytics immediately when opening details
-    trackVisit(bookmark.id)
-
     setSelectedBookmark(bookmark)
     setIsModalOpen(true)
+    
+    // Track the visit using the combined function (updates both instances)
+    // Note: We'll track this after setting selectedBookmark so the dedicated instance is initialized
+    setTimeout(() => {
+      if (bookmark?.id) {
+        trackVisitCombined(bookmark.id)
+      }
+    }, 100)
     
     // Start time tracking for bookmark viewing
     const sessionStartTime = Date.now()
@@ -1631,8 +1733,8 @@ export default function Dashboard() {
   const visitSite = () => {
     if (!selectedBookmark) return
     
-    // Track the visit in real-time analytics (just count visits)
-    trackVisit(selectedBookmark.id)
+    // Track the visit using the combined function (updates both instances)
+    trackVisitCombined(selectedBookmark.id)
     
     // Open the bookmark URL
     window.open(selectedBookmark.url, '_blank', 'noopener,noreferrer')
@@ -1959,6 +2061,15 @@ export default function Dashboard() {
           loadBookmarks()
         }, 100)
         
+        // Refresh analytics summary to update the BROKEN card count
+        setTimeout(async () => {
+          try {
+            const res = await fetch('/api/analytics/summary')
+            const json = await res.json()
+            if (json && !json.error) setSummary(json)
+          } catch {}
+        }, 200)
+        
         showNotification(`Health check completed for ${data.results.length} bookmarks`)
       }
     } catch (error) {
@@ -1976,8 +2087,8 @@ export default function Dashboard() {
 
   // Calculate total visits across all bookmarks for percentage calculation - using live analytics data
   const totalVisits = bookmarks.reduce((sum, bookmark) => {
-    const analytics = getBookmarkAnalytics(bookmark.id)
-    return sum + (analytics ? analytics.visits : bookmark.visits || 0)
+    const analytics = getUnifiedBookmarkAnalytics(bookmark.id)
+    return sum + (analytics ? analytics.visits : 0) // Never fall back to bookmark.visits
   }, 0)
 
   // Calculate usage percentage for a bookmark
@@ -2738,9 +2849,17 @@ export default function Dashboard() {
               <Eye className="h-4 w-4 text-gray-500" />
               <span className="text-sm text-gray-600 font-medium">
                 {(() => {
-                  const analytics = getBookmarkAnalytics(bookmark.id)
-                  return analytics ? analytics.visits : bookmark.visits
-                })()} VISITS
+                  const analytics = getUnifiedBookmarkAnalytics(bookmark.id)
+                  const directCache = directAnalyticsCache[bookmark.id]
+                  
+
+                  
+                  // NEVER fall back to bookmark data - always use analytics or show 0
+                  // This prevents the reversion issue on page refresh
+                  const finalVisits = (analytics && analytics.visits !== undefined) ? analytics.visits : 0;
+                  
+                  return finalVisits;
+                })()}
               </span>
               {/* Real-time indicator */}
               {!analyticsLoading && getBookmarkAnalytics(bookmark.id) && (
@@ -2751,10 +2870,17 @@ export default function Dashboard() {
               <Clock className="h-4 w-4 text-green-600" />
               <span className="text-sm text-green-600 font-medium">
                 {(() => {
-                  const analytics = getBookmarkAnalytics(bookmark.id)
-                  const timeSpent = analytics ? analytics.timeSpent : bookmark.timeSpent || 0
-                  return timeSpent > 0 ? `${timeSpent}m` : '0m'
-                })()} TIME
+                  const analytics = getUnifiedBookmarkAnalytics(bookmark.id)
+                  const directCache = directAnalyticsCache[bookmark.id]
+                  
+
+                  
+                  // NEVER fall back to bookmark data - always use analytics or show 0
+                  const timeSpent = analytics ? analytics.timeSpent : 0
+                  const timeDisplay = timeSpent > 0 ? `${timeSpent}m` : '0m';
+                  
+                  return timeDisplay;
+                })()}
               </span>
               {/* Real-time indicator */}
               {!analyticsLoading && getBookmarkAnalytics(bookmark.id) && (
@@ -2769,8 +2895,8 @@ export default function Dashboard() {
                 d="M35 4 L55 15 L55 40 L35 51 L15 40 L15 15 Z"
                 fill="white"
                 stroke={(() => {
-                  const analytics = getBookmarkAnalytics(bookmark.id)
-                  const visits = analytics ? analytics.visits : (bookmark.visits || 0)
+                  const analytics = getUnifiedBookmarkAnalytics(bookmark.id)
+                  const visits = analytics ? analytics.visits : 0
                   const percentage = getUsagePercentage(visits)
                   return getPercentageColor(percentage)
                 })()}
@@ -2782,8 +2908,8 @@ export default function Dashboard() {
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fill={(() => {
-                  const analytics = getBookmarkAnalytics(bookmark.id)
-                  const visits = analytics ? analytics.visits : (bookmark.visits || 0)
+                  const analytics = getUnifiedBookmarkAnalytics(bookmark.id)
+                  const visits = analytics ? analytics.visits : 0
                   const percentage = getUsagePercentage(visits)
                   return getPercentageColor(percentage)
                 })()}
@@ -2791,8 +2917,8 @@ export default function Dashboard() {
                 fontWeight="bold"
               >
                 {(() => {
-                  const analytics = getBookmarkAnalytics(bookmark.id)
-                  const visits = analytics ? analytics.visits : (bookmark.visits || 0)
+                  const analytics = getUnifiedBookmarkAnalytics(bookmark.id)
+                  const visits = analytics ? analytics.visits : 0
                   return getUsagePercentage(visits)
                 })()}%
               </text>
@@ -3006,9 +3132,9 @@ export default function Dashboard() {
               <Eye className="h-4 w-4 text-gray-600" />
               <p className="text-sm text-gray-600 font-semibold">
                 {(() => {
-                  const analytics = getBookmarkAnalytics(bookmark.id);
+                  const analytics = getUnifiedBookmarkAnalytics(bookmark.id);
                   console.log('🔍 Analytics for', bookmark.id, ':', analytics);
-                  return analytics?.visits || bookmark.visits || 'No data';
+                  return analytics?.visits || 0;
                 })()}
               </p>
               <span className="text-sm text-gray-500 font-medium uppercase">Visits</span>
@@ -3053,7 +3179,7 @@ export default function Dashboard() {
               fill="white"
               stroke={(() => {
                 const analytics = getBookmarkAnalytics(bookmark.id)
-                const visits = analytics ? analytics.visits : (bookmark.visits || 0)
+                const visits = analytics ? analytics.visits : 0
                 const percentage = getUsagePercentage(visits)
                 return getPercentageColor(percentage)
               })()}
@@ -3066,7 +3192,7 @@ export default function Dashboard() {
               dominantBaseline="middle"
               fill={(() => {
                 const analytics = getBookmarkAnalytics(bookmark.id)
-                const visits = analytics ? analytics.visits : (bookmark.visits || 0)
+                const visits = analytics ? analytics.visits : 0
                 const percentage = getUsagePercentage(visits)
                 return getPercentageColor(percentage)
               })()}
@@ -3075,7 +3201,7 @@ export default function Dashboard() {
             >
               {(() => {
                 const analytics = getBookmarkAnalytics(bookmark.id)
-                const visits = analytics ? analytics.visits : (bookmark.visits || 0)
+                const visits = analytics ? analytics.visits : 0
                 return getUsagePercentage(visits)
               })()}%
             </text>
@@ -3455,8 +3581,8 @@ export default function Dashboard() {
               <Bookmark className="h-4 w-4 text-gray-500" />
               <span className="text-sm text-gray-600 font-medium uppercase">
                 {(() => {
-                  const analytics = getBookmarkAnalytics(bookmark.id)
-                  return analytics ? analytics.visits : bookmark.visits || 0
+                  const analytics = getUnifiedBookmarkAnalytics(bookmark.id)
+                  return analytics ? analytics.visits : 0
                 })()} VISITS
               </span>
               {/* Live indicator */}
@@ -3469,8 +3595,8 @@ export default function Dashboard() {
           {/* Bottom Right: Usage Hexagon */}
           <div className="flex items-center space-x-4">
             <UsageHexagon percentage={(() => {
-              const analytics = getBookmarkAnalytics(bookmark.id)
-              const visits = analytics ? analytics.visits : (bookmark.visits || 0)
+              const analytics = getUnifiedBookmarkAnalytics(bookmark.id)
+              const visits = analytics ? analytics.visits : 0
               return getUsagePercentage(visits)
             })()} />
           </div>
@@ -3549,7 +3675,7 @@ export default function Dashboard() {
           {/* Usage Percentage Hexagon */}
           <UsageHexagon percentage={(() => {
             const analytics = getBookmarkAnalytics(bookmark.id)
-            const visits = analytics ? analytics.visits : (bookmark.visits || 0)
+            const visits = analytics ? analytics.visits : 0
             return getUsagePercentage(visits)
           })()} />
         </Card>
@@ -3620,8 +3746,8 @@ export default function Dashboard() {
             
             {/* Usage Percentage Hexagon */}
             <UsageHexagon percentage={(() => {
-              const analytics = getBookmarkAnalytics(bookmark.id)
-              const visits = analytics ? analytics.visits : (bookmark.visits || 0)
+              const analytics = getUnifiedBookmarkAnalytics(bookmark.id)
+              const visits = analytics ? analytics.visits : 0
               return getUsagePercentage(visits)
             })()} />
           </Card>
@@ -5097,7 +5223,7 @@ export default function Dashboard() {
               // Track time spent viewing the bookmark (minimum 1 minute for any interaction)
               if (timeSpentMinutes >= 0) {
                 // Use client hook (optimistic) and also fire legacy endpoint for backwards-compat
-                trackTimeSpent(session.bookmarkId, Math.max(timeSpentMinutes, 1))
+                trackTimeSpentCombined(session.bookmarkId, Math.max(timeSpentMinutes, 1))
                 fetch('/api/bookmarks/analytics', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -5499,14 +5625,11 @@ export default function Dashboard() {
                       <CardContent className="p-6 text-center">
                         <Eye className="h-7 w-7 mx-auto mb-3 text-blue-600" />
                         <p className="text-3xl font-bold text-gray-900">
-                          {(() => {
-                            const analytics = getBookmarkAnalytics(selectedBookmark.id)
-                            return analytics ? analytics.visits : selectedBookmark.visits || 0
-                          })()}
+                          {getSelectedBookmarkAnalytics(selectedBookmark.id)?.visits || selectedBookmark.visits || 0}
                         </p>
                         <p className="text-xs text-muted-foreground font-medium">TOTAL VISITS</p>
                         {/* Live indicator */}
-                        {!analyticsLoading && getBookmarkAnalytics(selectedBookmark.id) && (
+                        {!selectedBookmarkAnalyticsLoading && getSelectedBookmarkAnalytics(selectedBookmark.id) && (
                           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mt-1 mx-auto" title="Live data" />
                         )}
                       </CardContent>
@@ -5516,14 +5639,13 @@ export default function Dashboard() {
                         <Clock className="h-7 w-7 mx-auto mb-3 text-green-600" />
                         <p className="text-3xl font-bold text-gray-900">
                           {(() => {
-                            const analytics = getBookmarkAnalytics(selectedBookmark.id)
-                            const timeSpent = analytics ? analytics.timeSpent : selectedBookmark.timeSpent || 0
-                            return timeSpent > 0 ? `${timeSpent}m` : '0m'
+                            const timeSpent = getSelectedBookmarkAnalytics(selectedBookmark.id)?.timeSpent || selectedBookmark.timeSpent || 0;
+                            return timeSpent > 0 ? `${timeSpent}m` : '0m';
                           })()}
                         </p>
                         <p className="text-xs text-muted-foreground font-medium">TIME SPENT</p>
                         {/* Live indicator */}
-                        {!analyticsLoading && getBookmarkAnalytics(selectedBookmark.id) && (
+                        {!selectedBookmarkAnalyticsLoading && getSelectedBookmarkAnalytics(selectedBookmark.id) && (
                           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mt-1 mx-auto" title="Live data" />
                         )}
                       </CardContent>
@@ -5532,14 +5654,11 @@ export default function Dashboard() {
                       <CardContent className="p-6 text-center">
                         <Activity className="h-7 w-7 mx-auto mb-3 text-purple-600" />
                         <p className="text-3xl font-bold text-gray-900">
-                          {(() => {
-                            const analytics = getBookmarkAnalytics(selectedBookmark.id)
-                            return analytics ? analytics.weeklyVisits : selectedBookmark.weeklyVisits || 0
-                          })()}
+                          {getSelectedBookmarkAnalytics(selectedBookmark.id)?.weeklyVisits || selectedBookmark.weeklyVisits || 0}
                         </p>
                         <p className="text-xs text-muted-foreground font-medium">THIS WEEK</p>
                         {/* Live indicator */}
-                        {!analyticsLoading && getBookmarkAnalytics(selectedBookmark.id) && (
+                        {!selectedBookmarkAnalyticsLoading && getSelectedBookmarkAnalytics(selectedBookmark.id) && (
                           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mt-1 mx-auto" title="Live data" />
                         )}
                       </CardContent>
@@ -5635,8 +5754,11 @@ export default function Dashboard() {
                                   className="p-4 hover:shadow-lg transition-all duration-300 cursor-pointer border border-gray-300 hover:border-blue-400 bg-gradient-to-br from-white via-gray-50/20 to-white backdrop-blur-sm shadow-sm hover:shadow-blue-500/10"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    try { trackVisit(bookmark.id); } catch {}
                                     setSelectedBookmark(bookmark);
+                                    // Track visit after setting selected bookmark
+                                    setTimeout(() => {
+                                      try { trackVisitCombined(bookmark.id); } catch {}
+                                    }, 100);
                                   }}
                                 >
                                   <div className="flex items-start space-x-3">
@@ -5676,7 +5798,10 @@ export default function Dashboard() {
                                         </Badge>
                                         <div className="flex items-center space-x-1 text-xs text-gray-500">
                                           <Eye className="h-3 w-3" />
-                                          <span>{bookmark.visits}</span>
+                                          <span>{(() => {
+                                            const analytics = getUnifiedBookmarkAnalytics(bookmark.id)
+                                            return analytics ? analytics.visits : 0
+                                          })()}</span>
                                         </div>
                                       </div>
                                     </div>
