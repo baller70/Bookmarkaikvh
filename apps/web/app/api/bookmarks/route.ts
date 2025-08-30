@@ -26,6 +26,44 @@ const supabase = USE_SUPABASE ? createClient(
   supabaseKey!
 ) : null;
 
+// Direct REST API helper functions (backup for client issues)
+async function directSupabaseInsert(data: any) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/bookmarks`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${supabaseKey}`,
+      'apikey': supabaseKey!,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(data)
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Supabase direct insert failed: ${error}`);
+  }
+  
+  return response.json();
+}
+
+async function directSupabaseSelect() {
+  const response = await fetch(`${supabaseUrl}/rest/v1/bookmarks?user_id=is.null&order=created_at.desc`, {
+    headers: {
+      'Authorization': `Bearer ${supabaseKey}`,
+      'apikey': supabaseKey!,
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Supabase direct select failed: ${error}`);
+  }
+  
+  return response.json();
+}
+
 console.log('🔧 Storage Configuration:');
 console.log('📊 USE_SUPABASE:', USE_SUPABASE);
 console.log('📁 USE_FILES_FALLBACK:', USE_FILES_FALLBACK);
@@ -405,6 +443,27 @@ export async function POST(request: NextRequest) {
 
         if (insertResult.error) {
           console.error('❌ Supabase insert error:', insertResult.error);
+
+          // If "Invalid API key" error, try direct REST API approach
+          if (insertResult.error.message?.includes('Invalid API key')) {
+            console.log('🔄 Supabase client API key error, trying direct REST API...');
+            try {
+              const directPayload = { ...insertPayload, user_id: null }; // Use null for dev
+              const directResult = await directSupabaseInsert(directPayload);
+              console.log('✅ Direct API success:', directResult[0]);
+              return NextResponse.json({ 
+                success: true, 
+                bookmark: directResult[0], 
+                message: 'Bookmark created successfully via direct API' 
+              });
+            } catch (directError) {
+              console.error('❌ Direct API also failed:', directError);
+              return NextResponse.json(
+                { error: 'Failed to create bookmark', details: (directError as Error).message },
+                { status: 500 }
+              );
+            }
+          }
 
           // If foreign key error due to missing profile, try to seed the dev profile and retry once
           if (insertResult.error.code === '23503' && insertResult.error.message?.includes('bookmarks_user_id_fkey')) {
