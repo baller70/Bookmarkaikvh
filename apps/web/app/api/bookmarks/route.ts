@@ -28,19 +28,33 @@ const supabase = USE_SUPABASE ? createClient(
 
 // Direct REST API helper functions (backup for client issues)
 async function directSupabaseInsert(data: any) {
+  console.log('🧪 Direct API Debug:');
+  console.log('- URL:', `${supabaseUrl}/rest/v1/bookmarks`);
+  console.log('- Key length:', supabaseKey?.length);
+  console.log('- Key start:', supabaseKey?.substring(0, 20) + '...');
+  console.log('- Data:', JSON.stringify(data));
+  
+  const headers = {
+    'Authorization': `Bearer ${supabaseKey}`,
+    'apikey': supabaseKey!,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  };
+  
+  console.log('- Headers:', JSON.stringify(headers, null, 2));
+  
   const response = await fetch(`${supabaseUrl}/rest/v1/bookmarks`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${supabaseKey}`,
-      'apikey': supabaseKey!,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
-    },
+    headers,
     body: JSON.stringify(data)
   });
   
+  console.log('- Response status:', response.status);
+  console.log('- Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
+  
   if (!response.ok) {
     const error = await response.text();
+    console.log('- Response body:', error);
     throw new Error(`Supabase direct insert failed: ${error}`);
   }
   
