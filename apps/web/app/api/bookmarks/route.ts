@@ -16,7 +16,8 @@ const USE_SUPABASE = !!(
   supabaseUrl && 
   supabaseKey &&
   !supabaseUrl.includes('placeholder') &&
-  !supabaseKey.includes('placeholder')
+  !supabaseKey.includes('placeholder') &&
+  !supabaseKey.includes('dev-placeholder')
 );
 const USE_FILES_FALLBACK = !USE_SUPABASE;
 

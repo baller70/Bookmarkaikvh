@@ -53,7 +53,8 @@ const USE_SUPABASE = !!(
   supabaseUrl &&
   supabaseKey &&
   !supabaseUrl.includes('placeholder') &&
-  !supabaseKey.includes('placeholder')
+  !supabaseKey.includes('placeholder') &&
+  !supabaseKey.includes('dev-placeholder')
 )
 // Never use file fallback in production – Vercel functions are ephemeral
 const USE_FILES_FALLBACK = !USE_SUPABASE && process.env.NODE_ENV !== 'production'
