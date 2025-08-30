@@ -278,10 +278,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🚀 POST /api/bookmarks - Starting request processing');
+    
     // Per user instruction, always use the bypass ID for testing (same as GET).
     const userId = '00000000-0000-0000-0000-000000000001';
     console.log(`[API OVERRIDE] Forcing userId to dev bypass: ${userId}`);
+    
+    console.log('📦 Parsing request body...');
     const body = await request.json();
+    console.log('📦 Request body parsed successfully:', JSON.stringify(body, null, 2));
     let { id, title, url, description, category, tags, ai_summary, ai_tags, ai_category, notes, customBackground, relatedBookmarks, enableAI = true } = body;
     
     // AI WORKAROUND for broken UI: If title is missing but AI is on, generate title from content.
@@ -316,7 +321,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    console.log('🔍 Storage check - USE_SUPABASE:', USE_SUPABASE, 'supabase client:', !!supabase);
+    
     if (USE_SUPABASE && supabase) {
+      console.log('✅ Using Supabase for bookmark operations');
       // Use Supabase for all operations
       if (id) {
         // UPDATE existing bookmark
@@ -505,11 +513,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, bookmark: newBookmark, message: 'Bookmark created successfully' });
       }
     } else {
+      console.error('❌ No storage method available - USE_SUPABASE:', USE_SUPABASE, 'USE_FILES_FALLBACK:', USE_FILES_FALLBACK);
       return NextResponse.json({ error: 'No storage method available' }, { status: 500 });
     }
     
   } catch (error) {
-    console.error('❌ Unexpected error:', error);
+    console.error('❌ POST /api/bookmarks - Unexpected error occurred:', error);
+    console.error('❌ Error stack:', (error as Error).stack);
+    console.error('❌ Error details:', JSON.stringify(error, null, 2));
     return NextResponse.json(
       { error: 'Internal server error', details: (error as Error).message },
       { status: 500 }
