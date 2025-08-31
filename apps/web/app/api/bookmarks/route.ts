@@ -423,16 +423,26 @@ export async function POST(request: NextRequest) {
         // This allows testing without requiring full Supabase auth setup
         console.log('⚠️ Note: Creating bookmark without user_id to avoid foreign key constraint (test mode)');
 
-        // Optional AI analysis
+        // AI analysis - run when enableAI is true and we don't have pre-provided AI data
         let ai = { summary: ai_summary, tags: ai_tags, category: ai_category } as { summary?: string; tags?: string[]; category?: string };
-        if (enableAI && (!ai_summary || !ai_tags || ai_tags?.length === 0)) {
+        if (enableAI && !ai_summary && !ai_tags) {
+          console.log('🤖 Running AI analysis for bookmark:', title, url);
           try {
             const result = await contentAnalysisService.analyzeContent({ url, title, description, userId });
             ai = { summary: result.aiSummary, tags: result.aiTags, category: result.aiCategory };
+            console.log('✅ AI analysis successful:', {
+              summary: ai.summary?.substring(0, 50) + '...',
+              category: ai.category,
+              tags: ai.tags?.slice(0, 3)
+            });
           } catch (e) {
-            console.warn('AI analysis failed, falling back:', (e as Error).message);
+            console.warn('❌ AI analysis failed, using fallbacks:', (e as Error).message);
             ai = { summary: description || '', tags: tags || [], category: category || 'General' };
           }
+        } else if (enableAI && (ai_summary || ai_tags)) {
+          console.log('📋 Using pre-provided AI data, skipping analysis');
+        } else {
+          console.log('🚫 AI analysis disabled or not needed');
         }
 
         // Only use columns that actually exist in the Supabase bookmarks table
@@ -562,18 +572,41 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, bookmark: updatedBookmark, message: 'Bookmark updated successfully' });
       } else {
         // CREATE new bookmark
+        
+        // AI analysis for file storage - run when enableAI is true and we don't have pre-provided AI data
+        let ai = { summary: ai_summary, tags: ai_tags, category: ai_category } as { summary?: string; tags?: string[]; category?: string };
+        if (enableAI && !ai_summary && !ai_tags) {
+          console.log('🤖 Running AI analysis for bookmark (File Storage):', title, url);
+          try {
+            const result = await contentAnalysisService.analyzeContent({ url, title, description, userId });
+            ai = { summary: result.aiSummary, tags: result.aiTags, category: result.aiCategory };
+            console.log('✅ AI analysis successful (File Storage):', {
+              summary: ai.summary?.substring(0, 50) + '...',
+              category: ai.category,
+              tags: ai.tags?.slice(0, 3)
+            });
+          } catch (e) {
+            console.warn('❌ AI analysis failed (File Storage), using fallbacks:', (e as Error).message);
+            ai = { summary: description || '', tags: tags || [], category: category || 'General' };
+          }
+        } else if (enableAI && (ai_summary || ai_tags)) {
+          console.log('📋 Using pre-provided AI data (File Storage), skipping analysis');
+        } else {
+          console.log('🚫 AI analysis disabled or not needed (File Storage)');
+        }
+        
         const newId = Math.max(0, ...allBookmarks.map(b => b.id)) + 1;
         const newBookmark: Bookmark = {
           id: newId,
           user_id: userId,
           title,
           url,
-          description: description || '',
-          category: category || 'General',
-          tags: tags || [],
-          ai_summary,
-          ai_tags: ai_tags || [],
-          ai_category,
+          description: description || ai.summary || '',
+          category: category || ai.category || 'General',
+          tags: tags || ai.tags || [],
+          ai_summary: ai.summary || null,
+          ai_tags: ai.tags || [],
+          ai_category: ai.category || null,
           notes: notes || '',
           relatedBookmarks: relatedBookmarks || [],
           created_at: new Date().toISOString(),
