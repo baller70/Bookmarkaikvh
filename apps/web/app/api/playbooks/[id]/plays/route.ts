@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+// Initialize Supabase client with proper fallback
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
+const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
+
+// Check if we should use Supabase
+const USE_SUPABASE = supabaseUrl && supabaseKey && 
+  !supabaseKey.includes('dev-placeholder') && 
+  !supabaseKey.includes('dev-placeholder-service-key')
+
+let supabase: any = null
+if (USE_SUPABASE) {
+  supabase = createClient(supabaseUrl, supabaseKey)
+}
 
 // POST /api/playbooks/[id]/plays - Record a playbook play
 export async function POST(
@@ -19,6 +28,15 @@ export async function POST(
 
     if (!user_id) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
+
+    if (!USE_SUPABASE || !supabase) {
+      console.log('⚠️  Supabase not available, simulating play recording')
+      return NextResponse.json({
+        success: true,
+        message: 'Play recorded',
+        mock: true
+      })
     }
 
     // Check if playbook exists

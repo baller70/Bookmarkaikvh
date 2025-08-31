@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+// Initialize Supabase client with proper fallback
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
+const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
 
-// Debug logging
-console.log('🔧 API Route Debug:')
-console.log('- Supabase URL:', supabaseUrl ? 'SET' : 'MISSING')
-console.log('- Service Key:', supabaseServiceKey ? 'SET' : 'MISSING')
+// Check if we should use Supabase
+const USE_SUPABASE = supabaseUrl && supabaseKey && 
+  !supabaseKey.includes('dev-placeholder') && 
+  !supabaseKey.includes('dev-placeholder-service-key')
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+let supabase: any = null
+if (USE_SUPABASE) {
+  supabase = createClient(supabaseUrl, supabaseKey)
+}
 
 // Check if tables exist
 async function checkTablesExist() {
+  if (!USE_SUPABASE || !supabase) {
+    return false
+  }
+  
   try {
     const { error } = await supabase
       .from('user_playbooks')

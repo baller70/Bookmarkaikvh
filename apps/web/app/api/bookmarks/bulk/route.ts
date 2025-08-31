@@ -3,10 +3,29 @@ import { writeFile, readFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { authenticateUser, createUnauthorizedResponse } from '@/lib/auth-utils';
+import { createClient } from '@supabase/supabase-js';
 // import { performAIAnalysis } from '../../../../lib/ai/content-analysis';
 
 // File-based storage for persistent bookmarks
 const BOOKMARKS_FILE = join(process.cwd(), 'data', 'bookmarks.json');
+
+// Initialize Supabase client with proper fallback
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
+const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
+
+// Check if we should use Supabase
+const USE_SUPABASE = supabaseUrl && supabaseKey && 
+  !supabaseKey.includes('dev-placeholder') && 
+  !supabaseKey.includes('dev-placeholder-service-key')
+
+let supabase: any = null
+if (USE_SUPABASE) {
+  supabase = createClient(supabaseUrl, supabaseKey)
+}
+
+console.log('🔧 Bulk API Storage Configuration:')
+console.log('📊 USE_SUPABASE:', USE_SUPABASE)
+console.log('📁 USE_FILES_FALLBACK:', !USE_SUPABASE)
 
 interface Bookmark {
   id: number;
@@ -378,28 +397,73 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      const allBookmarks = await loadBookmarks();
       const bookmarkIdsToDelete = bookmark_ids.map(id => parseInt(id.toString()));
+      let bookmarksToDelete: any[] = [];
+      let deletedCount = 0;
       
-      // Find bookmarks to delete (must belong to the user)
-      const bookmarksToDelete = allBookmarks.filter(b => 
-        b.user_id === userId && bookmarkIdsToDelete.includes(b.id)
-      );
-      
-      // Remove bookmarks
-      const updatedBookmarks = allBookmarks.filter(b => 
-        !(b.user_id === userId && bookmarkIdsToDelete.includes(b.id))
-      );
-      
-      await saveBookmarks(updatedBookmarks);
+      if (USE_SUPABASE && supabase) {
+        console.log('🔄 Using Supabase for bulk delete');
+        
+        // First, get the bookmarks that will be deleted (for response data)
+        const { data: bookmarksData, error: fetchError } = await supabase
+          .from('bookmarks')
+          .select('id, title, url, user_id')
+          .in('id', bookmarkIdsToDelete)
+          .or(`user_id.eq.${userId},user_id.is.null`);
+        
+        if (fetchError) {
+          console.error('Error fetching bookmarks for delete:', fetchError);
+          return NextResponse.json(
+            { error: 'Failed to fetch bookmarks for deletion' },
+            { status: 500 }
+          );
+        }
+        
+        bookmarksToDelete = bookmarksData || [];
+        
+        // Delete the bookmarks
+        const { error: deleteError } = await supabase
+          .from('bookmarks')
+          .delete()
+          .in('id', bookmarkIdsToDelete)
+          .or(`user_id.eq.${userId},user_id.is.null`);
+        
+        if (deleteError) {
+          console.error('Error deleting bookmarks:', deleteError);
+          return NextResponse.json(
+            { error: 'Failed to delete bookmarks' },
+            { status: 500 }
+          );
+        }
+        
+        deletedCount = bookmarksToDelete.length;
+        
+      } else {
+        console.log('🔄 Using file storage for bulk delete');
+        
+        const allBookmarks = await loadBookmarks();
+        
+        // Find bookmarks to delete (must belong to the user)
+        bookmarksToDelete = allBookmarks.filter(b => 
+          b.user_id === userId && bookmarkIdsToDelete.includes(b.id)
+        );
+        
+        // Remove bookmarks
+        const updatedBookmarks = allBookmarks.filter(b => 
+          !(b.user_id === userId && bookmarkIdsToDelete.includes(b.id))
+        );
+        
+        await saveBookmarks(updatedBookmarks);
+        deletedCount = bookmarksToDelete.length;
+      }
       
       const result: BulkOperationResult = {
         success: true,
         total: bookmark_ids.length,
-        processed: bookmarksToDelete.length,
-        failed: bookmark_ids.length - bookmarksToDelete.length,
-        errors: bookmark_ids.length > bookmarksToDelete.length ? 
-          [`${bookmark_ids.length - bookmarksToDelete.length} bookmarks not found or don't belong to user`] : [],
+        processed: deletedCount,
+        failed: bookmark_ids.length - deletedCount,
+        errors: bookmark_ids.length > deletedCount ? 
+          [`${bookmark_ids.length - deletedCount} bookmarks not found or don't belong to user`] : [],
         data: {
           deleted_bookmarks: bookmarksToDelete.map(b => ({
             id: b.id,
@@ -407,7 +471,7 @@ export async function POST(request: NextRequest) {
             url: b.url
           }))
         },
-        message: `Bulk delete completed: ${bookmarksToDelete.length} bookmarks deleted`,
+        message: `Bulk delete completed: ${deletedCount} bookmarks deleted`,
         processing_time_ms: Date.now() - startTime
       };
       

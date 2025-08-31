@@ -320,6 +320,7 @@ export default function Dashboard() {
   const [showAddBookmark, setShowAddBookmark] = useState(false)
   const [selectedBookmarks, setSelectedBookmarks] = useState<number[]>([])
   const [selectedBookmark, setSelectedBookmark] = useState<any>(null)
+  const scrollPositionRef = useRef({ x: 0, y: 0 })
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [chartTimePeriod, setChartTimePeriod] = useState('3months')
@@ -1120,7 +1121,7 @@ export default function Dashboard() {
       history.scrollRestoration = 'manual'
     }
     
-    // Add CSS to prevent scroll jumping
+    // Add CSS to prevent scroll jumping and anchor scrolling
     const style = document.createElement('style')
     style.textContent = `
       html {
@@ -1129,21 +1130,55 @@ export default function Dashboard() {
       body {
         overflow-anchor: none;
       }
+      * {
+        scroll-behavior: auto !important;
+      }
     `
     document.head.appendChild(style)
     
+    // Store current scroll position to restore after re-renders
+    let lastScrollPosition = { x: window.scrollX, y: window.scrollY }
+    
+    const handleScrollPreservation = () => {
+      lastScrollPosition = { x: window.scrollX, y: window.scrollY }
+    }
+    
+    // Track scroll position changes
+    window.addEventListener('scroll', handleScrollPreservation, { passive: true })
+    
     return () => {
       // Cleanup
-      document.head.removeChild(style)
+      if (document.head.contains(style)) {
+        document.head.removeChild(style)
+      }
+      window.removeEventListener('scroll', handleScrollPreservation)
       if (history.scrollRestoration) {
         history.scrollRestoration = 'auto'
       }
     }
-  }, [])
+  }, [bulkMode])
 
-  // Monitor selectedBookmarks changes for debugging
+  // Monitor selectedBookmarks changes and restore scroll position
   useEffect(() => {
     console.log('📋 Selected bookmarks changed:', selectedBookmarks.length)
+    
+    // Restore scroll position after state update
+    const restorePosition = () => {
+      const { x, y } = scrollPositionRef.current
+      if (y > 0 || x > 0) {
+        window.scrollTo({
+          left: x,
+          top: y,
+          behavior: 'auto'
+        })
+      }
+    }
+    
+    // Multiple restoration attempts to handle React timing
+    restorePosition()
+    requestAnimationFrame(restorePosition)
+    setTimeout(restorePosition, 0)
+    setTimeout(restorePosition, 10)
   }, [selectedBookmarks]);
 
   // Create folders for hierarchy after bookmarks are loaded
@@ -1462,42 +1497,20 @@ export default function Dashboard() {
   )
 
   const handleBookmarkSelect = (bookmarkId: number) => {
-    // Capture scroll position before any changes
-    const scrollY = window.scrollY
-    const scrollX = window.scrollX
-    
-    // Disable browser scroll restoration
-    const originalScrollRestoration = history.scrollRestoration
-    if (history.scrollRestoration) {
-      history.scrollRestoration = 'manual'
+    // Store current scroll position in ref before state update
+    scrollPositionRef.current = {
+      x: window.scrollX,
+      y: window.scrollY
     }
     
-    // Update state
+    console.log('📍 Storing scroll position:', scrollPositionRef.current)
+    
+    // Update state - the useEffect will handle scroll restoration
     setSelectedBookmarks(prev => 
       prev.includes(bookmarkId) 
         ? prev.filter(id => id !== bookmarkId)
         : [...prev, bookmarkId]
     )
-    
-    // Aggressive scroll position restoration
-    const restoreScroll = () => {
-      window.scrollTo(scrollX, scrollY)
-    }
-    
-    // Multiple restoration strategies to handle React re-render timing
-    restoreScroll() // Immediate
-    requestAnimationFrame(restoreScroll) // Next frame
-    setTimeout(restoreScroll, 0) // Next tick
-    setTimeout(restoreScroll, 1) // Micro delay
-    setTimeout(restoreScroll, 10) // Small delay
-    setTimeout(restoreScroll, 50) // Medium delay
-    
-    // Restore browser scroll restoration after everything settles
-    setTimeout(() => {
-      if (originalScrollRestoration) {
-        history.scrollRestoration = originalScrollRestoration
-      }
-    }, 100)
   }
 
   const handleBookmarkClick = (bookmark: any) => {
@@ -4574,8 +4587,7 @@ export default function Dashboard() {
         },
         body: JSON.stringify({
           action: 'delete',
-          bookmark_ids: selectedBookmarks,
-          userId: 'dev-user-123'
+          bookmark_ids: selectedBookmarks
         })
       })
 
@@ -4586,7 +4598,7 @@ export default function Dashboard() {
         setBookmarks(prev => prev.filter(b => !selectedBookmarks.includes(b.id)))
         setSelectedBookmarks([])
         setBulkMode(false)
-        showNotification(`Successfully deleted ${data.deletedCount} bookmark(s)`)
+        showNotification(`Successfully deleted ${data.processed} bookmark(s)`)
       } else {
         showNotification('Failed to delete bookmarks: ' + data.error)
       }
