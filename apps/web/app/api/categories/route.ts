@@ -324,26 +324,41 @@ export async function DELETE(request: NextRequest) {
     }
     
     if (USE_SUPABASE && supabase) {
-      // Count bookmarks in this category
-      const { data: countData, error: cntErr } = await supabase
+      // Get category name first - bookmarks use category name, not ID
+      const { data: catRow, error: catErr } = await supabase
+        .from('categories')
+        .select('id,name')
+        .eq('id', id)
+        .single()
+      
+      if (catErr) {
+        console.error('❌ Error fetching category for deletion:', catErr)
+        return NextResponse.json({ error: catErr.message }, { status: 500 })
+      }
+      
+      if (!catRow?.name) {
+        console.error('❌ Category not found for deletion')
+        return NextResponse.json({ error: 'Category not found' }, { status: 404 })
+      }
+      
+      // Count bookmarks with this category name
+      const { count, error: cntErr } = await supabase
         .from('bookmarks')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', uid)
-        .eq('category', id) // if your bookmarks.category stores name, change to name check below
-      if (cntErr) return NextResponse.json({ error: cntErr.message }, { status: 500 })
-      // If category reference is by name, refetch name first
-      let categoryName = id
-      const { data: catRow } = await supabase.from('categories').select('id,name').eq('id', id).single()
-      if (catRow?.name) {
-        const { count, error: cntErr2 } = await supabase
-          .from('bookmarks')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', uid)
-          .eq('category', catRow.name)
-        if (cntErr2) return NextResponse.json({ error: cntErr2.message }, { status: 500 })
-        if ((count as number) > 0) {
-          return NextResponse.json({ error: `Cannot delete category. It contains ${count} bookmarks. Please move or delete the bookmarks first.` }, { status: 400 })
-        }
+        .or(`user_id.eq.${uid},user_id.is.null`)
+        .eq('category', catRow.name)
+        
+      if (cntErr) {
+        console.error('❌ Error counting bookmarks for category deletion:', cntErr)
+        return NextResponse.json({ error: cntErr.message }, { status: 500 })
+      }
+      
+      console.log(`🔍 Category "${catRow.name}" (${id}) has ${count} bookmarks`)
+      
+      if ((count as number) > 0) {
+        return NextResponse.json({ 
+          error: `Cannot delete category "${catRow.name}". It contains ${count} bookmarks. Please move or delete the bookmarks first.` 
+        }, { status: 400 })
       }
       const { error: delErr } = await supabase.from('categories').delete().eq('id', id)
       if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
