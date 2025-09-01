@@ -520,9 +520,24 @@ export async function POST(request: NextRequest) {
               // Auto-upsert category for dev user so folders/categories reflect the new category
               const catName = (insertPayload.category || 'General');
               try {
-                await supabase
+                console.log('🔍 Checking if category exists (fallback path):', catName)
+                
+                // First, check if category already exists (any user_id)
+                const { data: existingCategory } = await supabase
                   .from('categories')
-                  .upsert({ user_id: null, name: catName, description: '', color: '#3B82F6' }, { onConflict: 'user_id,name' });
+                  .select('id, name, user_id')
+                  .eq('name', catName)
+                  .limit(1)
+                  .single()
+                
+                if (existingCategory) {
+                  console.log('✅ Category already exists (fallback path):', catName, 'with user_id:', existingCategory.user_id)
+                } else {
+                  console.log('🆕 Creating new category (fallback path):', catName)
+                  await supabase
+                    .from('categories')
+                    .upsert({ user_id: null, name: catName, description: '', color: '#3B82F6' }, { onConflict: 'user_id,name' });
+                }
               } catch (e) {
                 console.warn('⚠️ Category upsert warning (fallback path):', (e as Error).message);
               }
@@ -540,33 +555,49 @@ export async function POST(request: NextRequest) {
         // Auto-upsert category in Supabase based on the bookmark's category
         const catName = insertPayload.category || 'General'
         try {
-          // Try with userId first, fallback to null if FK constraint fails
-          let categoryResult = await supabase
+          console.log('🔍 Checking if category exists:', catName)
+          
+          // First, check if category already exists (any user_id)
+          const { data: existingCategory } = await supabase
             .from('categories')
-            .upsert({
-              user_id: userId,
-              name: catName,
-              description: '',
-              color: '#3B82F6'
-            }, { onConflict: 'user_id,name' })
+            .select('id, name, user_id')
+            .eq('name', catName)
+            .limit(1)
+            .single()
+          
+          if (existingCategory) {
+            console.log('✅ Category already exists:', catName, 'with user_id:', existingCategory.user_id)
+          } else {
+            console.log('🆕 Creating new category:', catName)
             
-          if (categoryResult.error && categoryResult.error.code === '23503') {
-            // FK constraint failed, try with null user_id
-            console.log('🔄 Category upsert: FK constraint failed, retrying with null user_id')
-            categoryResult = await supabase
+            // Try with userId first, fallback to null if FK constraint fails
+            let categoryResult = await supabase
               .from('categories')
               .upsert({
-                user_id: null,
+                user_id: userId,
                 name: catName,
                 description: '',
                 color: '#3B82F6'
               }, { onConflict: 'user_id,name' })
-          }
-          
-          if (categoryResult.error) {
-            console.warn('⚠️ Category upsert warning:', categoryResult.error.message)
-          } else {
-            console.log('✅ Category upserted successfully:', catName)
+              
+            if (categoryResult.error && categoryResult.error.code === '23503') {
+              // FK constraint failed, try with null user_id
+              console.log('🔄 Category upsert: FK constraint failed, retrying with null user_id')
+              categoryResult = await supabase
+                .from('categories')
+                .upsert({
+                  user_id: null,
+                  name: catName,
+                  description: '',
+                  color: '#3B82F6'
+                }, { onConflict: 'user_id,name' })
+            }
+            
+            if (categoryResult.error) {
+              console.warn('⚠️ Category upsert warning:', categoryResult.error.message)
+            } else {
+              console.log('✅ Category upserted successfully:', catName)
+            }
           }
         } catch (e) {
           console.warn('⚠️ Category upsert exception:', (e as any)?.message)
