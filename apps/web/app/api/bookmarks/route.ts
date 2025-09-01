@@ -553,9 +553,10 @@ export async function POST(request: NextRequest) {
         }
 
         // Auto-upsert category in Supabase based on the bookmark's category OR ai_category
-        const catName = insertPayload.category || insertPayload.ai_category || 'General'
+        const catName = category || ai_category || 'General'
+        console.log(`✅✅✅ [API] Determined category for upsert: ${catName}. Provided category: ${category}, AI category: ${ai_category}`);
         try {
-          console.log('🔍 Checking if category exists:', catName)
+          console.log('🔍 [API] Checking if category exists:', catName)
           
           // First, check if category already exists (any user_id)
           const { data: existingCategory } = await supabase
@@ -566,9 +567,9 @@ export async function POST(request: NextRequest) {
             .single()
           
           if (existingCategory) {
-            console.log('✅ Category already exists:', catName, 'with user_id:', existingCategory.user_id)
+            console.log('✅ [API] Category already exists:', catName, 'with user_id:', existingCategory.user_id)
           } else {
-            console.log('🆕 Creating new category:', catName)
+            console.log('🆕 [API] Creating new category:', catName)
             
             // Try with userId first, fallback to null if FK constraint fails
             let categoryResult = await supabase
@@ -594,14 +595,16 @@ export async function POST(request: NextRequest) {
             }
             
             if (categoryResult.error) {
-              console.warn('⚠️ Category upsert warning:', categoryResult.error.message)
+              console.warn('⚠️ [API] Category upsert warning:', categoryResult.error.message)
             } else {
-              console.log('✅ Category upserted successfully:', catName)
+              console.log('✅ [API] Category upserted successfully:', catName)
             }
           }
         } catch (e) {
-          console.warn('⚠️ Category upsert exception:', (e as any)?.message)
+          console.warn('🛑 [API] CRITICAL: Category upsert exception:', (e as any)?.message)
         }
+
+        // --- End Category Upsert ---
 
         console.log('✅ Successfully created bookmark (Supabase):', insertResult.data);
         return NextResponse.json({ success: true, bookmark: insertResult.data, message: 'Bookmark created successfully' });

@@ -1309,7 +1309,7 @@ export default function Dashboard() {
           }
         });
         const data = await res.json();
-        console.log('📁 Refreshed categories response:', data);
+        console.log('✅✅✅ [DashboardClient] Fetched categories after bookmark creation. Success:', data.success, 'Count:', data.categories?.length);
         if (data?.success && data.categories) {
           const folders = data.categories.map((category: any) => ({
             id: `folder-${category.id}`,
@@ -1319,14 +1319,14 @@ export default function Dashboard() {
             bookmarkCount: category.bookmarkCount
           }));
           setDynamicFolders(folders);
-          console.log('✅ Updated dynamic folders state:', folders.length, 'folders');
+          console.log('✅✅✅ [DashboardClient] Successfully updated dynamicFolders state.');
         } else {
           toast({ title: "Sync Warning", description: data.error || "Could not refresh categories. Please refresh the page.", variant: "destructive" });
-          console.warn('⚠️ Could not refresh categories after bookmark creation.', data?.error);
+          console.error('🛑🛑🛑 [DashboardClient] Failed to refresh categories after bookmark creation.', data?.error);
         }
       } catch (e) {
         toast({ title: "Sync Error", description: "An error occurred while refreshing categories. Please refresh the page.", variant: "destructive" });
-        console.error('❌ Error refreshing categories:', e);
+        console.error('🛑🛑🛑 [DashboardClient] CRITICAL: Exception while refreshing categories:', e);
       }
       
       console.log('✅ Bookmarks and folders reloaded from database');
