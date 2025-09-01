@@ -369,7 +369,7 @@ export default function CategoriesPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
+            </div>
 
           {/* Search Bar */}
           <div className="relative">
@@ -513,6 +513,7 @@ export default function CategoriesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   )
 } 
