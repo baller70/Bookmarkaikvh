@@ -1515,10 +1515,21 @@ export default function Dashboard() {
         : [...prev, idStr]
     )
 
+    // Also capture document scrolling element to preserve exact row
+    const container: HTMLElement | Document | null = (document.scrollingElement as any) || document.documentElement
+    const containerY = (container as any)?.scrollTop ?? 0
+
     // Immediate restoration attempts to prevent any jump
-    window.scrollTo({ left: saved.x, top: saved.y, behavior: 'auto' })
-    requestAnimationFrame(() => window.scrollTo({ left: saved.x, top: saved.y, behavior: 'auto' }))
-    setTimeout(() => window.scrollTo({ left: saved.x, top: saved.y, behavior: 'auto' }), 0)
+    const restore = () => {
+      window.scrollTo({ left: saved.x, top: saved.y, behavior: 'auto' })
+      if (container && 'scrollTop' in (container as any)) {
+        ;(container as any).scrollTop = containerY
+      }
+    }
+    restore()
+    requestAnimationFrame(restore)
+    setTimeout(restore, 0)
+    setTimeout(restore, 10)
   
   }
 
