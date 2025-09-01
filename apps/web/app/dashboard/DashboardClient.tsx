@@ -1132,6 +1132,7 @@ export default function Dashboard() {
       }
       * {
         scroll-behavior: auto !important;
+        overflow-anchor: none;
       }
     `
     document.head.appendChild(style)
@@ -1496,22 +1497,29 @@ export default function Dashboard() {
     selectedBookmark ? bookmark.id !== selectedBookmark.id : true
   )
 
-  const handleBookmarkSelect = (bookmarkId: number | string) => {
-    // Store current scroll position in ref before state update
-    scrollPositionRef.current = {
-      x: window.scrollX,
-      y: window.scrollY
+  const handleBookmarkSelect = (bookmarkId: number | string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
     }
+
+    // Store current scroll position in ref before state update
+    const saved = { x: window.scrollX, y: window.scrollY }
+    scrollPositionRef.current = saved
     
-    console.log('📍 Storing scroll position:', scrollPositionRef.current)
-    
-    // Update state - the useEffect will handle scroll restoration
+    // Update state - the useEffect will handle additional restoration attempts
     const idStr = String(bookmarkId)
     setSelectedBookmarks(prev => 
       prev.includes(idStr) 
         ? prev.filter(id => id !== idStr)
         : [...prev, idStr]
     )
+
+    // Immediate restoration attempts to prevent any jump
+    window.scrollTo({ left: saved.x, top: saved.y, behavior: 'auto' })
+    requestAnimationFrame(() => window.scrollTo({ left: saved.x, top: saved.y, behavior: 'auto' }))
+    setTimeout(() => window.scrollTo({ left: saved.x, top: saved.y, behavior: 'auto' }), 0)
+  
   }
 
   const handleBookmarkClick = (bookmark: any) => {
@@ -2667,7 +2675,7 @@ export default function Dashboard() {
             e.preventDefault()
             e.stopPropagation()
             console.log('Checkbox clicked for bookmark:', bookmark.id)
-            handleBookmarkSelect(bookmark.id)
+            handleBookmarkSelect(bookmark.id, e)
           }}
         >
           <div 
@@ -3057,7 +3065,7 @@ export default function Dashboard() {
                e.preventDefault()
                e.stopPropagation()
                console.log('Compact checkbox clicked for bookmark:', bookmark.id)
-               handleBookmarkSelect(bookmark.id)
+               handleBookmarkSelect(bookmark.id, e)
              }}
            >
              <div 
@@ -3465,7 +3473,7 @@ export default function Dashboard() {
              e.preventDefault()
              e.stopPropagation()
              console.log('List checkbox clicked for bookmark:', bookmark.id)
-             handleBookmarkSelect(bookmark.id)
+             handleBookmarkSelect(bookmark.id, e)
            }}
          >
            <div 
