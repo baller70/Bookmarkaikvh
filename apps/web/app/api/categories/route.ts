@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
       const { data: counts, error: cntErr } = await supabase
         .from('bookmarks')
         .select('category, count:count()', { head: false, count: 'exact' })
-        .eq('user_id', userId)
+        .or(`user_id.eq.${userId},user_id.is.null`)
         .group('category')
 
       if (cntErr) throw new Error(cntErr.message)
