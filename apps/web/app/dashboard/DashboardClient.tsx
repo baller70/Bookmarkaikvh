@@ -300,7 +300,6 @@ function ClientOnlyDndProvider({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>
 }
-
 export default function Dashboard() {
   // Reading search params forces dynamic rendering
   const searchParams = useSearchParams();
@@ -714,23 +713,8 @@ export default function Dashboard() {
   }, []);
 
   // ---- Folder category ordering state (for compact & list views) ----
-  const [folderCategories, setFolderCategories] = useState<string[]>([]);
   const [bulkMode, setBulkMode] = useState(false);
   const scrollLockRef = useRef(false);
-
-  // Initialize / sync folderCategories with current bookmark categories while preserving user-defined order
-  useEffect(() => {
-    const currentCategories = Array.from(new Set(bookmarks.map((b) => b.category)));
-
-    setFolderCategories((prev) => {
-      if (prev.length === 0) {
-        return currentCategories; // initial load
-      }
-      const missing = currentCategories.filter((c) => !prev.includes(c));
-      if (missing.length === 0) return prev;
-      return [...prev, ...missing];
-    });
-  }, [bookmarks]);
 
   // Generate dynamic folders from dedicated categories API
   useEffect(() => {
@@ -1085,7 +1069,6 @@ export default function Dashboard() {
 
     loadHierarchyAssignments();
   }, [userId]);
-
   // Save hierarchy assignments to API - MOVED UP TO FIX HOOKS ORDER
   const saveHierarchyAssignments = async (assignments: FolderHierarchyAssignment[]) => {
     try {
@@ -1885,7 +1868,6 @@ export default function Dashboard() {
     setNewDefaultLogo(userDefaultLogo)
     setShowDefaultLogoModal(true)
   }
-
   const handleBackgroundUpload = async () => {
     if (!selectedBookmark) return;
     
@@ -2040,10 +2022,10 @@ export default function Dashboard() {
 
       // Handle category folder reordering for Compact & List folder views
       if ((viewMode === 'compact' || viewMode === 'list') && compactViewMode === 'folders') {
-        const activeCatIndex = folderCategories.findIndex((cat) => cat === active.id)
-        const overCatIndex = folderCategories.findIndex((cat) => cat === over.id)
-        if (activeCatIndex !== -1 && overCatIndex !== -1) {
-          setFolderCategories((items) => arrayMove(items, activeCatIndex, overCatIndex))
+        const activeIndex = dynamicFolders.findIndex((f) => f.id === active.id)
+        const overIndex = dynamicFolders.findIndex((f) => f.id === over.id)
+        if (activeIndex !== -1 && overIndex !== -1) {
+          setDynamicFolders((items) => arrayMove(items, activeIndex, overIndex))
           return
         }
       }
@@ -2681,7 +2663,6 @@ export default function Dashboard() {
       </div>
     )
   }
-
   const GridBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <Card 
       className="group hover:shadow-2xl transition-all duration-500 cursor-pointer bg-white border border-gray-300 backdrop-blur-sm relative overflow-hidden"
@@ -2926,7 +2907,6 @@ export default function Dashboard() {
 
                   
                   // NEVER fall back to bookmark data - always use analytics or show 0
-                  // This prevents the reversion issue on page refresh
                   const finalVisits = (analytics && analytics.visits !== undefined) ? analytics.visits : 0;
                   
                   return finalVisits;
@@ -3393,7 +3373,7 @@ export default function Dashboard() {
   )
 
   // Sortable Folder Cards for Drag and Drop
-  const SortableCompactFolderCard = ({ category, bookmarkCount }: { category: string, bookmarkCount: number }) => {
+  const SortableCompactFolderCard = ({ category, bookmarkCount, id }: { category: string, bookmarkCount: number, id: string }) => {
     const {
       attributes,
       listeners,
@@ -3401,7 +3381,7 @@ export default function Dashboard() {
       transform,
       transition,
       isDragging,
-    } = useSortable({ id: category })
+    } = useSortable({ id })
 
     const style = {
       transform: CSS.Transform.toString(transform),
@@ -3424,7 +3404,7 @@ export default function Dashboard() {
     )
   }
 
-  const SortableListFolderCard = ({ category, bookmarkCount }: { category: string, bookmarkCount: number }) => {
+  const SortableListFolderCard = ({ category, bookmarkCount, id }: { category: string, bookmarkCount: number, id: string }) => {
     const {
       attributes,
       listeners,
@@ -3432,7 +3412,7 @@ export default function Dashboard() {
       transform,
       transition,
       isDragging,
-    } = useSortable({ id: category })
+    } = useSortable({ id })
 
     const style = {
       transform: CSS.Transform.toString(transform),
@@ -3454,7 +3434,6 @@ export default function Dashboard() {
       </div>
     )
   }
-
   const SortableListBookmarkCard = ({ bookmark }: { bookmark: any }) => {
     const {
       attributes,
@@ -4063,7 +4042,6 @@ export default function Dashboard() {
       </div>
     )
   }
-
   const renderBookmarks = () => {
     const bookmarkIds = filteredBookmarks.map(bookmark => bookmark.id)
     
@@ -4089,7 +4067,7 @@ export default function Dashboard() {
       case 'compact':
         if (compactViewMode === 'folders') {
           // Show folder view - group bookmarks by category
-          const categories = folderCategories
+          const folders = dynamicFolders
           return (
             <ClientOnlyDndProvider>
               <DndContext
@@ -4097,18 +4075,16 @@ export default function Dashboard() {
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
-                <SortableContext items={categories} strategy={rectSortingStrategy}>
+                <SortableContext items={folders.map(f => f.id)} strategy={rectSortingStrategy}>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                    {categories.map((category) => {
-                      const categoryBookmarks = bookmarks.filter(bookmark => bookmark.category === category)
-                      return (
-                        <SortableCompactFolderCard 
-                          key={category} 
-                          category={category} 
-                          bookmarkCount={categoryBookmarks.length} 
-                        />
-                      )
-                    })}
+                    {folders.map((folder) => (
+                      <SortableCompactFolderCard 
+                        key={folder.id} 
+                        id={folder.id}
+                        category={folder.name} 
+                        bookmarkCount={folder.bookmarkCount} 
+                      />
+                    ))}
                   </div>
                 </SortableContext>
               </DndContext>
@@ -4165,7 +4141,7 @@ export default function Dashboard() {
       case 'list':
         if (compactViewMode === 'folders') {
           // Show folder view for list - group bookmarks by category
-          const categories = folderCategories
+          const folders = dynamicFolders
           return (
             <ClientOnlyDndProvider>
               <DndContext
@@ -4173,18 +4149,16 @@ export default function Dashboard() {
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
-                <SortableContext items={categories} strategy={verticalListSortingStrategy}>
+                <SortableContext items={folders.map(f => f.id)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-4">
-                    {categories.map((category) => {
-                      const categoryBookmarks = bookmarks.filter(bookmark => bookmark.category === category)
-                      return (
-                        <SortableListFolderCard 
-                          key={category} 
-                          category={category} 
-                          bookmarkCount={categoryBookmarks.length} 
-                        />
-                      )
-                    })}
+                    {folders.map((folder) => (
+                      <SortableListFolderCard 
+                        key={folder.id} 
+                        id={folder.id}
+                        category={folder.name} 
+                        bookmarkCount={folder.bookmarkCount} 
+                      />
+                    ))}
                   </div>
                 </SortableContext>
               </DndContext>
@@ -4718,7 +4692,6 @@ export default function Dashboard() {
       setSelectedBookmarks(filteredBookmarks.map(b => b.id))
     }
   }
-
   return (
     <div className="min-h-screen">
       <div className="p-6">
@@ -6407,7 +6380,6 @@ export default function Dashboard() {
                     const getStepStatus = (stepId: string) => {
                       return arpCompletedSteps.includes(stepId);
                     };
-
                     return (
                       <div className="space-y-6">
                         {/* Header */}
@@ -7125,7 +7097,6 @@ export default function Dashboard() {
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Default Logo Modal */}
       <Dialog open={showDefaultLogoModal} onOpenChange={setShowDefaultLogoModal}>
         <DialogContent className="max-w-md bg-gradient-to-br from-white via-gray-50/20 to-white border border-gray-200/60 shadow-2xl">
