@@ -716,46 +716,46 @@ export default function Dashboard() {
   const [bulkMode, setBulkMode] = useState(false);
   const scrollLockRef = useRef(false);
 
-  // Generate dynamic folders from dedicated categories API
-  useEffect(() => {
-    const loadDynamicFolders = async () => {
-      try {
-        // Fetch categories from the dedicated categories API
-        console.log('🔄 Loading dynamic folders from categories API...');
-        const response = await fetch(`/api/categories?t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
-        });
-        const data = await response.json();
-        console.log('📁 Initial dynamic folders API response:', data);
-        
-        if (data.success && data.categories) {
-          // Convert categories to folder format
-          const folders = data.categories.map((category: any) => ({
-            id: `folder-${category.id}`,
-            name: category.name,
-            description: category.description,
-            color: category.color,
-            bookmarkCount: category.bookmarkCount
-          }));
-          
-          setDynamicFolders(folders);
-          console.log('📁 Loaded dynamic folders from categories API:', folders);
-        } else {
-          console.log('⚠️ No categories found, using empty folders');
-          setDynamicFolders([]);
-        }
-      } catch (error) {
-        console.error('❌ Error loading dynamic folders:', error);
-        // Fallback to empty folders
-        setDynamicFolders([]);
-      }
-    };
+  // THIS useEffect that loads dynamic folders is now REMOVED
+  // useEffect(() => {
+  //   const loadDynamicFolders = async () => {
+  //     try {
+  //       // Fetch categories from the dedicated categories API
+  //       console.log('🔄 Loading dynamic folders from categories API...');
+  //       const response = await fetch(`/api/categories?t=${Date.now()}`, {
+  //         cache: 'no-store',
+  //         headers: {
+  //           'Cache-Control': 'no-cache'
+  //         }
+  //       });
+  //       const data = await response.json();
+  //       console.log('📁 Initial dynamic folders API response:', data);
+  //       
+  //       if (data.success && data.categories) {
+  //         // Convert categories to folder format
+  //         const folders = data.categories.map((category: any) => ({
+  //           id: `folder-${category.id}`,
+  //           name: category.name,
+  //           description: category.description,
+  //           color: category.color,
+  //           bookmarkCount: category.bookmarkCount
+  //         }));
+  //         
+  //         setDynamicFolders(folders);
+  //         console.log('📁 Loaded dynamic folders from categories API:', folders);
+  //       } else {
+  //         console.log('⚠️ No categories found, using empty folders');
+  //         setDynamicFolders([]);
+  //       }
+  //     } catch (error) {
+  //       console.error('❌ Error loading dynamic folders:', error);
+  //       // Fallback to empty folders
+  //       setDynamicFolders([]);
+  //     }
+  //   };
 
-    loadDynamicFolders();
-  }, []); // Load once on component mount
+  //   loadDynamicFolders();
+  // }, []); // Load once on component mount
 
   // Reset compact view mode when switching away from compact/list view
   useEffect(() => {
@@ -1171,27 +1171,6 @@ export default function Dashboard() {
     setTimeout(restorePosition, 10)
   }, [selectedBookmarks]);
 
-  // Create folders for hierarchy after bookmarks are loaded
-  const foldersForHierarchyV1 = useMemo(() => {
-    const categories = [...new Set(bookmarks.map((b) => b.category))];
-    return categories.map((cat) => ({
-      id: cat,
-      name: cat,
-      color: '#6b7280',
-      bookmark_count: bookmarks.filter((b) => b.category === cat).length,
-    }));
-  }, [bookmarks]);
-
-  const filteredBookmarks = bookmarks.filter(bookmark => {
-    const matchesSearch = bookmark.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         bookmark.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (Array.isArray(bookmark.tags) && bookmark.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase())))
-    
-    const matchesCategory = selectedCategory === 'all' || bookmark.category.toLowerCase() === selectedCategory.toLowerCase()
-    
-    return matchesSearch && matchesCategory
-  })
-
   // Loading state and empty state handling
   console.log('🟢 Dashboard render: isLoadingBookmarks =', isLoadingBookmarks);
   console.log('🟢 Dashboard render: bookmarks.length =', bookmarks.length);
@@ -1298,36 +1277,10 @@ export default function Dashboard() {
       await loadBookmarks();
       
       // Add a small delay to ensure category is fully created in database
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Increased delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      try {
-        console.log('🔄 Refreshing categories after bookmark creation...');
-        const res = await fetch(`/api/categories?t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
-        });
-        const data = await res.json();
-        console.log('✅✅✅ [DashboardClient] Fetched categories after bookmark creation. Success:', data.success, 'Count:', data.categories?.length);
-        if (data?.success && data.categories) {
-          const folders = data.categories.map((category: any) => ({
-            id: `folder-${category.id}`,
-            name: category.name,
-            description: category.description,
-            color: category.color,
-            bookmarkCount: category.bookmarkCount
-          }));
-          setDynamicFolders(folders);
-          console.log('✅✅✅ [DashboardClient] Successfully updated dynamicFolders state.');
-        } else {
-          toast({ title: "Sync Warning", description: data.error || "Could not refresh categories. Please refresh the page.", variant: "destructive" });
-          console.error('🛑🛑🛑 [DashboardClient] Failed to refresh categories after bookmark creation.', data?.error);
-        }
-      } catch (e) {
-        toast({ title: "Sync Error", description: "An error occurred while refreshing categories. Please refresh the page.", variant: "destructive" });
-        console.error('🛑🛑🛑 [DashboardClient] CRITICAL: Exception while refreshing categories:', e);
-      }
+      console.log('✅✅✅ [DashboardClient] Triggering category refresh via context...');
+      await refreshCategories();
       
       console.log('✅ Bookmarks and folders reloaded from database');
       setShowAddBookmark(false);

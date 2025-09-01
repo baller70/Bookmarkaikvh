@@ -3,6 +3,7 @@ import { Saira, Audiowide } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { Toaster } from 'sonner'
 import { StagewiseWrapper } from '@/components/StagewiseWrapper'
+import { CategoriesProvider } from '@/contexts/CategoriesContext'
 
 const saira = Saira({ subsets: ['latin'] })
 const audiowide = Audiowide({ 
@@ -25,13 +26,15 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${saira.className} ${audiowide.variable} min-h-screen antialiased`} suppressHydrationWarning>
         <ThemeProvider>
-          <div className="min-h-screen flex flex-col">
-            {children}
-          </div>
-          {/* Global toast notifications */}
-          <Toaster />
-          {/* Stagewise toolbar for AI-powered editing */}
-          <StagewiseWrapper />
+          <CategoriesProvider>
+            <div className="min-h-screen flex flex-col">
+              {children}
+            </div>
+            {/* Global toast notifications */}
+            <Toaster />
+            {/* Stagewise toolbar for AI-powered editing */}
+            <StagewiseWrapper />
+          </CategoriesProvider>
         </ThemeProvider>
       </body>
     </html>
