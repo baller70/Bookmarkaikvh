@@ -522,7 +522,7 @@ export async function POST(request: NextRequest) {
               try {
                 await supabase
                   .from('categories')
-                  .upsert({ user_id: userId, name: catName, description: '', color: '#3B82F6' }, { onConflict: 'user_id,name' });
+                  .upsert({ user_id: null, name: catName, description: '', color: '#3B82F6' }, { onConflict: 'user_id,name' });
               } catch (e) {
                 console.warn('⚠️ Category upsert warning (fallback path):', (e as Error).message);
               }
@@ -540,7 +540,8 @@ export async function POST(request: NextRequest) {
         // Auto-upsert category in Supabase based on the bookmark's category
         const catName = insertPayload.category || 'General'
         try {
-          await supabase
+          // Try with userId first, fallback to null if FK constraint fails
+          let categoryResult = await supabase
             .from('categories')
             .upsert({
               user_id: userId,
@@ -548,8 +549,27 @@ export async function POST(request: NextRequest) {
               description: '',
               color: '#3B82F6'
             }, { onConflict: 'user_id,name' })
+            
+          if (categoryResult.error && categoryResult.error.code === '23503') {
+            // FK constraint failed, try with null user_id
+            console.log('🔄 Category upsert: FK constraint failed, retrying with null user_id')
+            categoryResult = await supabase
+              .from('categories')
+              .upsert({
+                user_id: null,
+                name: catName,
+                description: '',
+                color: '#3B82F6'
+              }, { onConflict: 'user_id,name' })
+          }
+          
+          if (categoryResult.error) {
+            console.warn('⚠️ Category upsert warning:', categoryResult.error.message)
+          } else {
+            console.log('✅ Category upserted successfully:', catName)
+          }
         } catch (e) {
-          console.warn('⚠️ Category upsert warning:', (e as Error).message)
+          console.warn('⚠️ Category upsert exception:', (e as any)?.message)
         }
 
         console.log('✅ Successfully created bookmark (Supabase):', insertResult.data);
