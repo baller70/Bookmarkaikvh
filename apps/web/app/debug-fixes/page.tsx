@@ -1,10 +1,33 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 export default function DebugFixes() {
   const [selectedItems, setSelectedItems] = useState<number[]>([])
   const scrollPositionRef = useRef({ x: 0, y: 0 })
+
+  // Monitor selectedItems changes and restore scroll position
+  useEffect(() => {
+    console.log('📋 Selected items changed:', selectedItems.length)
+    
+    // Restore scroll position after state update
+    const restorePosition = () => {
+      const { x, y } = scrollPositionRef.current
+      if (y > 0 || x > 0) {
+        window.scrollTo({
+          left: x,
+          top: y,
+          behavior: 'auto'
+        })
+      }
+    }
+    
+    // Multiple restoration attempts to handle React timing
+    restorePosition()
+    requestAnimationFrame(restorePosition)
+    setTimeout(restorePosition, 0)
+    setTimeout(restorePosition, 10)
+  }, [selectedItems])
 
   const handleItemSelect = (itemId: number) => {
     // Store current scroll position in ref before state update

@@ -16,9 +16,9 @@ export interface AuthResult {
 export async function authenticateUser(request: NextRequest): Promise<AuthResult> {
   try {
     // Check if authentication bypass is enabled
-    const bypassAuth = process.env.BYPASS_AUTHENTICATION === 'true'
+    const bypassAuth = (process.env.BYPASS_AUTHENTICATION || '').trim() === 'true'
     const isDevelopment = process.env.NODE_ENV === 'development'
-    const enableFallback = process.env.ENABLE_FILE_STORAGE_FALLBACK === 'true'
+    const enableFallback = (process.env.ENABLE_FILE_STORAGE_FALLBACK || '').trim() === 'true'
     
     // Allow bypass in development, when explicitly enabled, or when using fallback storage
     if (bypassAuth || isDevelopment || enableFallback) {
