@@ -150,66 +150,77 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { name, description, color, user_id } = body;
-    
+
+    // Prefer authenticated user, fallback to provided user_id
+    let uid = user_id as string | undefined
+    try {
+      const auth = await authenticateUser(request)
+      if (auth?.success && auth.userId) uid = auth.userId
+    } catch {}
+
     // Validate required fields
-    if (!name || !user_id) {
+    if (!name || !uid) {
       return NextResponse.json(
-        { error: 'Name and user_id are required' },
+        { error: 'Name is required' },
         { status: 400 }
       );
     }
-    
+
+    // Try Supabase first, then fallback to file storage
     if (USE_SUPABASE && supabase) {
-      // Supabase insert
-      const { data: existing, error: existErr } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('user_id', user_id)
-        .ilike('name', name)
-        .limit(1)
-      if (existErr) throw new Error(existErr.message)
-      if (existing && existing.length > 0) {
-        return NextResponse.json({ error: 'Category already exists' }, { status: 400 })
+      try {
+        const { data: existing, error: existErr } = await supabase
+          .from('categories')
+          .select('id')
+          .eq('user_id', uid)
+          .ilike('name', name)
+          .limit(1)
+        if (existErr) throw existErr
+        if (existing && existing.length > 0) {
+          return NextResponse.json({ error: 'Category already exists' }, { status: 400 })
+        }
+        const { data: inserted, error: insErr } = await supabase
+          .from('categories')
+          .insert([{ user_id: uid, name, description: description || '', color: color || '#3B82F6' }])
+          .select('id,name,description,color,created_at,updated_at')
+          .single()
+        if (insErr) throw insErr
+        return NextResponse.json({ success: true, category: {
+          id: inserted.id,
+          name: inserted.name,
+          description: inserted.description || '',
+          color: inserted.color || '#3B82F6',
+          bookmarkCount: 0,
+          createdAt: inserted.created_at,
+          updatedAt: inserted.updated_at
+        }, message: 'Category created successfully' })
+      } catch (e) {
+        console.warn('Supabase categories insert failed; falling back to file storage:', (e as any)?.message)
       }
-      const { data: inserted, error: insErr } = await supabase
-        .from('categories')
-        .insert([{ user_id, name, description: description || '', color: color || '#3B82F6' }])
-        .select('id,name,description,color,created_at,updated_at')
-        .single()
-      if (insErr) throw new Error(insErr.message)
-      return NextResponse.json({ success: true, category: {
-        id: inserted.id,
-        name: inserted.name,
-        description: inserted.description || '',
-        color: inserted.color || '#3B82F6',
-        bookmarkCount: 0,
-        createdAt: inserted.created_at,
-        updatedAt: inserted.updated_at
-      }, message: 'Category created successfully' })
-    } else {
-      // File storage path
-      const allCategories = await loadCategories();
-      const existingCategory = allCategories.find(
-        cat => cat.user_id === user_id && cat.name.toLowerCase() === name.toLowerCase()
-      );
-      if (existingCategory) {
-        return NextResponse.json({ error: 'Category already exists' }, { status: 400 });
-      }
-      const newCategory: Category = {
-        id: Date.now().toString(),
-        name,
-        description: description || '',
-        color: color || '#3B82F6',
-        user_id,
-        bookmarkCount: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      allCategories.push(newCategory);
-      await saveCategories(allCategories);
-      return NextResponse.json({ success: true, category: newCategory, message: 'Category created successfully' })
     }
-    
+
+    // File storage fallback path
+    const allCategories = await loadCategories();
+    const existingCategory = allCategories.find(
+      cat => cat.user_id === uid && cat.name.toLowerCase() === name.toLowerCase()
+    );
+    if (existingCategory) {
+      return NextResponse.json({ error: 'Category already exists' }, { status: 400 });
+    }
+    const newCategory: Category = {
+      id: Date.now().toString(),
+      name,
+      description: description || '',
+      color: color || '#3B82F6',
+      user_id: uid,
+      bookmarkCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    allCategories.push(newCategory);
+    await saveCategories(allCategories);
+    return NextResponse.json({ success: true, category: newCategory, message: 'Category created successfully' })
+
   } catch (error) {
     console.error('Error creating category:', error);
     return NextResponse.json(
