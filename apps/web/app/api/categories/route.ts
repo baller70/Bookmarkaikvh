@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
       // Supabase path: categories table + count bookmarks per category
       const { data: cats, error: catErr } = await supabase
         .from('categories')
-        .select('id,name,description,color,created_at,updated_at')
+        .select('id,name,description,color,created_at,updated_at,user_id')
         .or(`user_id.eq.${userId},user_id.is.null`)
 
       if (catErr) throw new Error(catErr.message)
@@ -113,7 +113,20 @@ export async function GET(request: NextRequest) {
         })
       }
 
-      categoriesWithCounts = (cats || []).map((c: any) => ({
+      // Deduplicate categories by name, preferring user-specific rows over null user_id
+      const dedupByName = new Map<string, any>()
+      ;(cats || []).forEach((c: any) => {
+        const existing = dedupByName.get(c.name)
+        if (!existing) {
+          dedupByName.set(c.name, c)
+        } else {
+          // Prefer the entry that has a non-null user_id
+          const prefer = existing.user_id ? existing : (c.user_id ? c : existing)
+          dedupByName.set(c.name, prefer)
+        }
+      })
+
+      categoriesWithCounts = Array.from(dedupByName.values()).map((c: any) => ({
         id: c.id,
         name: c.name,
         description: c.description || '',
@@ -332,7 +345,7 @@ export async function DELETE(request: NextRequest) {
           return NextResponse.json({ error: `Cannot delete category. It contains ${count} bookmarks. Please move or delete the bookmarks first.` }, { status: 400 })
         }
       }
-      const { error: delErr } = await supabase.from('categories').delete().eq('id', id).eq('user_id', uid)
+      const { error: delErr } = await supabase.from('categories').delete().eq('id', id)
       if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
       return NextResponse.json({ success: true, message: 'Category deleted successfully' })
     } else {
