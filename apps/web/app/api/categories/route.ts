@@ -11,6 +11,8 @@ const DATA_BASE_DIR = process.env.DATA_DIR || (process.env.VERCEL ? '/tmp/data' 
 const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
 const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
 const USE_SUPABASE = !!(supabaseUrl && supabaseKey && !supabaseKey.includes('dev-placeholder'))
+// Disable file fallback per user request
+const DISABLE_FILE_FALLBACK = true
 const supabase = USE_SUPABASE ? createClient(supabaseUrl, supabaseKey) : null
 
 // File-based storage for persistent categories
@@ -118,17 +120,7 @@ export async function GET(request: NextRequest) {
         updatedAt: c.updated_at
       }))
     } else {
-      // File path: load json and compute counts
-      const allCategories = await loadCategories();
-      const allBookmarks = await loadBookmarks();
-      const userCategories = allCategories.filter(cat => cat.user_id === userId);
-
-      categoriesWithCounts = userCategories.map(category => {
-        const bookmarkCount = allBookmarks.filter(
-          bookmark => bookmark.user_id === userId && bookmark.category === category.name
-        ).length;
-        return { ...category, bookmarkCount };
-      });
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
     }
     
     return NextResponse.json({
@@ -195,31 +187,12 @@ export async function POST(request: NextRequest) {
           updatedAt: inserted.updated_at
         }, message: 'Category created successfully' })
       } catch (e) {
-        console.warn('Supabase categories insert failed; falling back to file storage:', (e as any)?.message)
+        console.error('Supabase categories insert failed:', (e as any)?.message)
+        return NextResponse.json({ error: 'Supabase insert failed' }, { status: 500 })
       }
     }
 
-    // File storage fallback path
-    const allCategories = await loadCategories();
-    const existingCategory = allCategories.find(
-      cat => cat.user_id === uid && cat.name.toLowerCase() === name.toLowerCase()
-    );
-    if (existingCategory) {
-      return NextResponse.json({ error: 'Category already exists' }, { status: 400 });
-    }
-    const newCategory: Category = {
-      id: Date.now().toString(),
-      name,
-      description: description || '',
-      color: color || '#3B82F6',
-      user_id: uid,
-      bookmarkCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    allCategories.push(newCategory);
-    await saveCategories(allCategories);
-    return NextResponse.json({ success: true, category: newCategory, message: 'Category created successfully' })
+    return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
 
   } catch (error) {
     console.error('Error creating category:', error);
