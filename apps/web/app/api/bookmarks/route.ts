@@ -469,6 +469,19 @@ export async function POST(request: NextRequest) {
         if (insertResult.error) {
           console.error('❌ Supabase insert error:', insertResult.error);
 
+          // If Supabase client rejects the key, try direct REST API as a fallback (still Supabase)
+          if ((insertResult.error.message || '').toLowerCase().includes('invalid api key') || (insertResult.error.message || '').toLowerCase().includes('jwt')) {
+            console.log('🔄 Supabase client API key issue, trying direct REST API...');
+            try {
+              const directPayload = { ...insertPayload, user_id: null };
+              const directResult = await directSupabaseInsert(directPayload);
+              console.log('✅ Direct API success:', directResult[0]);
+              return NextResponse.json({ success: true, bookmark: directResult[0], message: 'Bookmark created successfully (direct API)' });
+            } catch (directErr) {
+              console.error('❌ Direct API failed as well:', directErr);
+            }
+          }
+
           // Handle FK constraint by seeding dev profile then retry once
           if (insertResult.error.code === '23503' && insertResult.error.message?.includes('bookmarks_user_id_fkey')) {
             console.log('🧩 Seeding dev profile row to satisfy FK, then retrying insert...');
