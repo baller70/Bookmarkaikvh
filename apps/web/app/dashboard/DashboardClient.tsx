@@ -737,8 +737,15 @@ export default function Dashboard() {
     const loadDynamicFolders = async () => {
       try {
         // Fetch categories from the dedicated categories API
-        const response = await fetch('/api/categories');
+        console.log('🔄 Loading dynamic folders from categories API...');
+        const response = await fetch(`/api/categories?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
         const data = await response.json();
+        console.log('📁 Initial dynamic folders API response:', data);
         
         if (data.success && data.categories) {
           // Convert categories to folder format
@@ -1307,9 +1314,21 @@ export default function Dashboard() {
       
       // Reload bookmarks and categories to reflect new category/folder
       await loadBookmarks();
+      
+      // Add a small delay to ensure category is fully created in database
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       try {
-        const res = await fetch('/api/categories');
+        console.log('🔄 Refreshing categories after bookmark creation...');
+        const res = await fetch(`/api/categories?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
         const data = await res.json();
+        console.log('📁 Categories API response:', data);
+        
         if (data?.success && data.categories) {
           const folders = data.categories.map((category: any) => ({
             id: `folder-${category.id}`,
@@ -1319,8 +1338,13 @@ export default function Dashboard() {
             bookmarkCount: category.bookmarkCount
           }));
           setDynamicFolders(folders);
+          console.log('✅ Dynamic folders updated:', folders.length, 'categories');
+        } else {
+          console.warn('⚠️ Categories API returned no data or failed:', data);
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) { 
+        console.error('❌ Error refreshing categories:', e);
+      }
       
       console.log('✅ Bookmarks and folders reloaded from database');
       setShowAddBookmark(false);

@@ -62,15 +62,26 @@ export default function CategoriesPage() {
   // Load categories from dedicated categories API
   const loadCategories = async () => {
     try {
-      const response = await fetch('/api/categories');
+      console.log('🔄 Loading categories from API...');
+      const response = await fetch(`/api/categories?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
       const data = await response.json();
+      console.log('📁 Categories API response:', data);
       
       if (data.success && data.categories) {
         setCategories(data.categories);
-        console.log('📁 Loaded categories:', data.categories.length);
+        console.log('✅ Loaded categories:', data.categories.length, 'categories');
+        console.log('📋 Category names:', data.categories.map(c => c.name));
+      } else {
+        console.warn('⚠️ Categories API returned no data or failed:', data);
+        setCategories([]);
       }
     } catch (error) {
-      console.error('Error loading categories:', error);
+      console.error('❌ Error loading categories:', error);
       // Fallback to empty array if API fails
       setCategories([]);
     }
