@@ -4,8 +4,10 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { authenticateUser } from '@/lib/auth-utils';
 
+// Resolve writable data directory (Vercel allows writes only to /tmp)
+const DATA_BASE_DIR = process.env.DATA_DIR || (process.env.VERCEL ? '/tmp/data' : join(process.cwd(), 'data'))
 // File-based storage for persistent categories
-const CATEGORIES_FILE = join(process.cwd(), 'data', 'categories.json');
+const CATEGORIES_FILE = join(DATA_BASE_DIR, 'categories.json');
 
 interface Category {
   id: string;
@@ -20,7 +22,7 @@ interface Category {
 
 // Ensure data directory exists
 async function ensureDataDirectory() {
-  const dataDir = join(process.cwd(), 'data');
+  const dataDir = DATA_BASE_DIR
   if (!existsSync(dataDir)) {
     await mkdir(dataDir, { recursive: true });
   }
@@ -55,7 +57,7 @@ async function saveCategories(categories: Category[]): Promise<void> {
 // Load bookmarks to get actual bookmark counts per category
 async function loadBookmarks(): Promise<any[]> {
   try {
-    const BOOKMARKS_FILE = join(process.cwd(), 'data', 'bookmarks.json');
+    const BOOKMARKS_FILE = join(DATA_BASE_DIR, 'bookmarks.json');
     if (!existsSync(BOOKMARKS_FILE)) {
       return [];
     }
