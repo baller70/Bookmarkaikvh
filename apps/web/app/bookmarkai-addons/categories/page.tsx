@@ -20,7 +20,8 @@ import {
   FolderOpen, 
   Hash,
   ArrowLeft,
-  Settings
+  Settings,
+  RefreshCw
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -59,23 +60,46 @@ export default function CategoriesPage() {
   })
 
   // Load categories from dedicated categories API
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const response = await fetch('/api/categories');
-        const data = await response.json();
-        
-        if (data.success && data.categories) {
-          setCategories(data.categories);
-        }
-      } catch (error) {
-        console.error('Error loading categories:', error);
-        // Fallback to empty array if API fails
-        setCategories([]);
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('/api/categories');
+      const data = await response.json();
+      
+      if (data.success && data.categories) {
+        setCategories(data.categories);
+        console.log('📁 Loaded categories:', data.categories.length);
       }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      // Fallback to empty array if API fails
+      setCategories([]);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    loadCategories();
+  }, [])
+
+  // Auto-refresh on page focus (when user switches back to this tab)
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('📁 Categories page focused, refreshing...');
+      loadCategories();
     };
 
-    loadCategories();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [])
+
+  // Periodic refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('📁 Auto-refreshing categories...');
+      loadCategories();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [])
 
   const filteredCategories = categories.filter(category =>
@@ -277,13 +301,24 @@ export default function CategoriesPage() {
               <p className="text-gray-600 dark:text-gray-400">Organize your bookmarks with custom categories</p>
             </div>
             
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="flex items-center space-x-2">
-                  <Plus className="h-4 w-4" />
-                  <span>Add Category</span>
-                </Button>
-              </DialogTrigger>
+            <div className="flex items-center space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={loadCategories}
+                className="flex items-center space-x-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span>Refresh</span>
+              </Button>
+              
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="flex items-center space-x-2">
+                    <Plus className="h-4 w-4" />
+                    <span>Add Category</span>
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>Create New Category</DialogTitle>
