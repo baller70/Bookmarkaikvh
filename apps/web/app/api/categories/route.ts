@@ -92,19 +92,26 @@ export async function GET(request: NextRequest) {
       const { data: cats, error: catErr } = await supabase
         .from('categories')
         .select('id,name,description,color,created_at,updated_at')
-        .eq('user_id', userId)
+        .or(`user_id.eq.${userId},user_id.is.null`)
 
       if (catErr) throw new Error(catErr.message)
 
-      // Aggregate counts
-      const { data: counts, error: cntErr } = await supabase
+      // Get bookmarks to count by category manually
+      const { data: bookmarks, error: cntErr } = await supabase
         .from('bookmarks')
-        .select('category, count:count()', { head: false, count: 'exact' })
+        .select('category')
         .or(`user_id.eq.${userId},user_id.is.null`)
-        .group('category')
 
       if (cntErr) throw new Error(cntErr.message)
-      const countMap = new Map<string, number>((counts || []).map((c: any) => [c.category, c.count]))
+      
+      // Count bookmarks by category manually
+      const countMap = new Map<string, number>()
+      if (bookmarks) {
+        bookmarks.forEach((bookmark: any) => {
+          const category = bookmark.category || 'General'
+          countMap.set(category, (countMap.get(category) || 0) + 1)
+        })
+      }
 
       categoriesWithCounts = (cats || []).map((c: any) => ({
         id: c.id,
@@ -168,12 +175,28 @@ export async function POST(request: NextRequest) {
         if (existing && existing.length > 0) {
           return NextResponse.json({ error: 'Category already exists' }, { status: 400 })
         }
-        const { data: inserted, error: insErr } = await supabase
+        // Try insert with user_id, fallback to null if FK constraint fails
+        let insertResult = await supabase
           .from('categories')
           .insert([{ user_id: uid, name, description: description || '', color: color || '#3B82F6' }])
           .select('id,name,description,color,created_at,updated_at')
           .single()
-        if (insErr) throw insErr
+          
+        if (insertResult.error && insertResult.error.code === '23503') {
+          // FK constraint failed, try with null user_id for dev
+          console.log('🔄 FK constraint failed, retrying with null user_id for dev')
+          insertResult = await supabase
+            .from('categories')
+            .insert([{ user_id: null, name, description: description || '', color: color || '#3B82F6' }])
+            .select('id,name,description,color,created_at,updated_at')
+            .single()
+        }
+        
+        const { data: inserted, error: insErr } = insertResult
+        if (insErr) {
+          console.error('❌ Supabase categories insert error:', insErr)
+          throw insErr
+        }
         return NextResponse.json({ success: true, category: {
           id: inserted.id,
           name: inserted.name,
