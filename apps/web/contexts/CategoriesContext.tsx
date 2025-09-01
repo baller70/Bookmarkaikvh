@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 
 interface Category {
   id: string;
