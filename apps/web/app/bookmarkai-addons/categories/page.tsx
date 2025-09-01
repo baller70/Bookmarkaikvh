@@ -149,8 +149,8 @@ export default function CategoriesPage() {
       const result = await response.json();
       
       if (result.success) {
-        // Add the new category to the local state
-        setCategories([...categories, result.category])
+        // Reload from server to ensure dedupe and accurate counts
+        await loadCategories()
         setNewCategory({ name: '', description: '', color: '#3B82F6' })
         setIsCreateDialogOpen(false)
         
@@ -203,9 +203,8 @@ export default function CategoriesPage() {
       const result = await response.json();
       
       if (result.success) {
-        setCategories(categories.map(cat => 
-          cat.id === editingCategory.id ? result.category : cat
-        ))
+        // Reload from server to ensure dedupe and accurate counts
+        await loadCategories()
         setIsEditDialogOpen(false)
         setEditingCategory(null)
         
@@ -238,15 +237,8 @@ export default function CategoriesPage() {
     }
 
     try {
-      const response = await fetch('/api/categories', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: categoryId,
-          // user_id inferred from auth or dev bypass
-        }),
+      const response = await fetch(`/api/categories?id=${categoryId}`, {
+        method: 'DELETE'
       });
 
       if (!response.ok) {
@@ -256,7 +248,8 @@ export default function CategoriesPage() {
       const result = await response.json();
       
       if (result.success) {
-        setCategories(categories.filter(cat => cat.id !== categoryId))
+        // Reload from server to ensure dedupe and accurate counts
+        await loadCategories()
         toast({
           title: "Success",
           description: "Category deleted successfully"
@@ -525,6 +518,5 @@ export default function CategoriesPage() {
         </DialogContent>
       </Dialog>
     </div>
-    </div>
   )
-} 
+}
