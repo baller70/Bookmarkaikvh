@@ -62,7 +62,7 @@ export default function CategoriesPage() {
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const response = await fetch('/api/categories?user_id=dev-user-123');
+        const response = await fetch('/api/categories');
         const data = await response.json();
         
         if (data.success && data.categories) {
@@ -103,7 +103,7 @@ export default function CategoriesPage() {
           name: newCategory.name,
           description: newCategory.description,
           color: newCategory.color,
-          user_id: 'dev-user-123'
+          // user_id inferred from auth or dev bypass
         }),
       });
 
@@ -157,7 +157,7 @@ export default function CategoriesPage() {
           name: editingCategory.name,
           description: editingCategory.description,
           color: editingCategory.color,
-          user_id: 'dev-user-123'
+          // user_id inferred from auth or dev bypass
         }),
       });
 
@@ -210,7 +210,7 @@ export default function CategoriesPage() {
         },
         body: JSON.stringify({
           id: categoryId,
-          user_id: 'dev-user-123'
+          // user_id inferred from auth or dev bypass
         }),
       });
 

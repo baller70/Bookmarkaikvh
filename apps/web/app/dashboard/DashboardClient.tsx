@@ -737,7 +737,7 @@ export default function Dashboard() {
     const loadDynamicFolders = async () => {
       try {
         // Fetch categories from the dedicated categories API
-        const response = await fetch('/api/categories?user_id=dev-user-123');
+        const response = await fetch('/api/categories');
         const data = await response.json();
         
         if (data.success && data.categories) {

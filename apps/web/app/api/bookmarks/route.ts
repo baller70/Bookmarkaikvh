@@ -487,6 +487,8 @@ export async function POST(request: NextRequest) {
         }
 
         console.log('✅ Successfully created bookmark (Supabase):', insertResult.data);
+
+        // Refresh category counts may be handled on client via refetch; nothing to do here
         return NextResponse.json({ success: true, bookmark: insertResult.data, message: 'Bookmark created successfully' });
       }
     } else if (USE_FILES_FALLBACK) {
