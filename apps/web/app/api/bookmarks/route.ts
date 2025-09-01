@@ -518,7 +518,7 @@ export async function POST(request: NextRequest) {
               .single();
             if (!retryNoUser.error) {
               // Auto-upsert category for dev user so folders/categories reflect the new category
-              const catName = (insertPayload.category || 'General');
+              const catName = (insertPayload.category || insertPayload.ai_category || 'General');
               try {
                 console.log('🔍 Checking if category exists (fallback path):', catName)
                 
@@ -552,8 +552,8 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Auto-upsert category in Supabase based on the bookmark's category
-        const catName = insertPayload.category || 'General'
+        // Auto-upsert category in Supabase based on the bookmark's category OR ai_category
+        const catName = insertPayload.category || insertPayload.ai_category || 'General'
         try {
           console.log('🔍 Checking if category exists:', catName)
           
