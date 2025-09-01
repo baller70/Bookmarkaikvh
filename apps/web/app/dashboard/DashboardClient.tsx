@@ -318,7 +318,7 @@ export default function Dashboard() {
   // State management
   const [viewMode, setViewMode] = useState('grid')
   const [showAddBookmark, setShowAddBookmark] = useState(false)
-  const [selectedBookmarks, setSelectedBookmarks] = useState<number[]>([])
+  const [selectedBookmarks, setSelectedBookmarks] = useState<string[]>([])
   const [selectedBookmark, setSelectedBookmark] = useState<any>(null)
   const scrollPositionRef = useRef({ x: 0, y: 0 })
   const [searchQuery, setSearchQuery] = useState('')
@@ -1496,7 +1496,7 @@ export default function Dashboard() {
     selectedBookmark ? bookmark.id !== selectedBookmark.id : true
   )
 
-  const handleBookmarkSelect = (bookmarkId: number) => {
+  const handleBookmarkSelect = (bookmarkId: number | string) => {
     // Store current scroll position in ref before state update
     scrollPositionRef.current = {
       x: window.scrollX,
@@ -1506,10 +1506,11 @@ export default function Dashboard() {
     console.log('📍 Storing scroll position:', scrollPositionRef.current)
     
     // Update state - the useEffect will handle scroll restoration
+    const idStr = String(bookmarkId)
     setSelectedBookmarks(prev => 
-      prev.includes(bookmarkId) 
-        ? prev.filter(id => id !== bookmarkId)
-        : [...prev, bookmarkId]
+      prev.includes(idStr) 
+        ? prev.filter(id => id !== idStr)
+        : [...prev, idStr]
     )
   }
 
@@ -2671,12 +2672,12 @@ export default function Dashboard() {
         >
           <div 
             className={`w-6 h-6 border-2 rounded-md flex items-center justify-center shadow-lg ${
-              selectedBookmarks.includes(bookmark.id) 
+              selectedBookmarks.includes(String(bookmark.id)) 
                 ? 'bg-blue-600 border-blue-600' 
                 : 'bg-white border-gray-400 hover:border-blue-500'
             }`}
           >
-            {selectedBookmarks.includes(bookmark.id) && (
+            {selectedBookmarks.includes(String(bookmark.id)) && (
               <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
@@ -3061,12 +3062,12 @@ export default function Dashboard() {
            >
              <div 
                className={`w-5 h-5 border-2 rounded-md flex items-center justify-center shadow-lg ${
-                 selectedBookmarks.includes(bookmark.id) 
+                 selectedBookmarks.includes(String(bookmark.id)) 
                    ? 'bg-blue-600 border-blue-600' 
                    : 'bg-white border-gray-400 hover:border-blue-500'
                }`}
              >
-               {selectedBookmarks.includes(bookmark.id) && (
+               {selectedBookmarks.includes(String(bookmark.id)) && (
                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                  </svg>
@@ -3469,12 +3470,12 @@ export default function Dashboard() {
          >
            <div 
              className={`w-6 h-6 border-2 rounded-md flex items-center justify-center shadow-lg ${
-               selectedBookmarks.includes(bookmark.id) 
+               selectedBookmarks.includes(String(bookmark.id)) 
                  ? 'bg-blue-600 border-blue-600' 
                  : 'bg-white border-gray-400 hover:border-blue-500'
              }`}
            >
-             {selectedBookmarks.includes(bookmark.id) && (
+             {selectedBookmarks.includes(String(bookmark.id)) && (
                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                </svg>
@@ -4595,7 +4596,7 @@ export default function Dashboard() {
 
       if (data.success) {
         // Remove deleted bookmarks from local state
-        setBookmarks(prev => prev.filter(b => !selectedBookmarks.includes(b.id)))
+        setBookmarks(prev => prev.filter(b => !selectedBookmarks.includes(String(b.id))))
         setSelectedBookmarks([])
         setBulkMode(false)
         showNotification(`Successfully deleted ${data.processed} bookmark(s)`)
@@ -4634,7 +4635,7 @@ export default function Dashboard() {
       if (data.success) {
         // Update bookmarks in local state
         setBookmarks(prev => prev.map(bookmark => 
-          selectedBookmarks.includes(bookmark.id) 
+          selectedBookmarks.includes(String(bookmark.id)) 
             ? { ...bookmark, category: newCategory }
             : bookmark
         ))
