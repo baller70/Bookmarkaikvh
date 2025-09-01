@@ -74,14 +74,15 @@ export default function CategoriesPage() {
       
       if (data.success && data.categories) {
         setCategories(data.categories);
-        console.log('✅ Loaded categories:', data.categories.length, 'categories');
-        console.log('📋 Category names:', data.categories.map(c => c.name));
+        console.log('✅ Loaded categories:', data.categories.length);
       } else {
-        console.warn('⚠️ Categories API returned no data or failed:', data);
+        toast({ title: "Error", description: data.error || "Failed to load categories.", variant: "destructive" });
+        console.error('Error loading categories:', data.error);
         setCategories([]);
       }
     } catch (error) {
-      console.error('❌ Error loading categories:', error);
+      toast({ title: "Error", description: "An unexpected error occurred while loading categories.", variant: "destructive" });
+      console.error('Error loading categories:', error);
       // Fallback to empty array if API fails
       setCategories([]);
     }
@@ -373,6 +374,7 @@ export default function CategoriesPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            </div>
             </div>
 
           {/* Search Bar */}

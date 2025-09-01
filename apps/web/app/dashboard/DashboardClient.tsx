@@ -1097,7 +1097,6 @@ export default function Dashboard() {
       showNotification('Error saving hierarchy assignments');
     }
   };
-
   // Handle hierarchy assignments change with persistence - MOVED UP TO FIX HOOKS ORDER
   const handleHierarchyAssignmentsChange = (assignments: FolderHierarchyAssignment[]) => {
     setFolderAssignments(assignments);
@@ -1299,7 +1298,7 @@ export default function Dashboard() {
       await loadBookmarks();
       
       // Add a small delay to ensure category is fully created in database
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Increased delay
       
       try {
         console.log('🔄 Refreshing categories after bookmark creation...');
@@ -1310,8 +1309,7 @@ export default function Dashboard() {
           }
         });
         const data = await res.json();
-        console.log('📁 Categories API response:', data);
-        
+        console.log('📁 Refreshed categories response:', data);
         if (data?.success && data.categories) {
           const folders = data.categories.map((category: any) => ({
             id: `folder-${category.id}`,
@@ -1321,11 +1319,13 @@ export default function Dashboard() {
             bookmarkCount: category.bookmarkCount
           }));
           setDynamicFolders(folders);
-          console.log('✅ Dynamic folders updated:', folders.length, 'categories');
+          console.log('✅ Updated dynamic folders state:', folders.length, 'folders');
         } else {
-          console.warn('⚠️ Categories API returned no data or failed:', data);
+          toast({ title: "Sync Warning", description: data.error || "Could not refresh categories. Please refresh the page.", variant: "destructive" });
+          console.warn('⚠️ Could not refresh categories after bookmark creation.', data?.error);
         }
-      } catch (e) { 
+      } catch (e) {
+        toast({ title: "Sync Error", description: "An error occurred while refreshing categories. Please refresh the page.", variant: "destructive" });
         console.error('❌ Error refreshing categories:', e);
       }
       
@@ -3464,7 +3464,6 @@ export default function Dashboard() {
       </div>
     )
   }
-
   const ListBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <Card 
       className="group hover:shadow-xl transition-all duration-400 cursor-pointer bg-white border border-black backdrop-blur-sm relative overflow-hidden rounded-lg"
