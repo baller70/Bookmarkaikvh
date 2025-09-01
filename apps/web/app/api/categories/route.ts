@@ -5,6 +5,8 @@ import { join } from 'path';
 import { authenticateUser } from '@/lib/auth-utils';
 import { createClient } from '@supabase/supabase-js';
 
+const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
+
 // Resolve writable data directory (Vercel allows writes only to /tmp)
 const DATA_BASE_DIR = process.env.DATA_DIR || (process.env.VERCEL ? '/tmp/data' : join(process.cwd(), 'data'))
 // Supabase init (if configured)
@@ -81,13 +83,7 @@ async function loadBookmarks(): Promise<any[]> {
 export async function GET(request: NextRequest) {
   try {
     const authResult = await authenticateUser(request);
-    if (!authResult.success) {
-      return NextResponse.json(
-        { error: authResult.error },
-        { status: authResult.status }
-      );
-    }
-    const userId = authResult.userId!;
+    const userId = authResult.success && authResult.userId ? authResult.userId : DEV_USER_ID;
     
     let categoriesWithCounts: any[] = []
 
@@ -143,12 +139,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, description, color, user_id } = body;
 
-    // Prefer authenticated user, fallback to provided user_id
+    // Prefer authenticated user; fallback to dev user if missing
     let uid = user_id as string | undefined
     try {
       const auth = await authenticateUser(request)
       if (auth?.success && auth.userId) uid = auth.userId
     } catch {}
+    if (!uid) uid = DEV_USER_ID
 
     // Validate required fields
     if (!name || !uid) {
@@ -208,8 +205,16 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { id, name, description, color, user_id } = body;
     
+    // Prefer authenticated user; fallback to dev user if missing
+    let uid = user_id as string | undefined
+    try {
+      const auth = await authenticateUser(request)
+      if (auth?.success && auth.userId) uid = auth.userId
+    } catch {}
+    if (!uid) uid = DEV_USER_ID
+
     // Validate required fields
-    if (!id || !name || !user_id) {
+    if (!id || !name || !uid) {
       return NextResponse.json(
         { error: 'ID, name, and user_id are required' },
         { status: 400 }
@@ -221,7 +226,7 @@ export async function PUT(request: NextRequest) {
         .from('categories')
         .update({ name, description: description || '', color: color || '#3B82F6' })
         .eq('id', id)
-        .eq('user_id', user_id)
+        .eq('user_id', uid)
         .select('id,name,description,color,created_at,updated_at')
         .single()
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -266,9 +271,16 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const user_id = searchParams.get('user_id');
+
+    // Prefer authenticated user; fallback to dev user if missing
+    let uid: string | null = null
+    try {
+      const auth = await authenticateUser(request as any)
+      if (auth?.success && auth.userId) uid = auth.userId
+    } catch {}
+    if (!uid) uid = DEV_USER_ID
     
-    if (!id || !user_id) {
+    if (!id || !uid) {
       return NextResponse.json(
         { error: 'ID and user_id are required' },
         { status: 400 }
@@ -280,7 +292,7 @@ export async function DELETE(request: NextRequest) {
       const { data: countData, error: cntErr } = await supabase
         .from('bookmarks')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', user_id)
+        .eq('user_id', uid)
         .eq('category', id) // if your bookmarks.category stores name, change to name check below
       if (cntErr) return NextResponse.json({ error: cntErr.message }, { status: 500 })
       // If category reference is by name, refetch name first
@@ -290,14 +302,14 @@ export async function DELETE(request: NextRequest) {
         const { count, error: cntErr2 } = await supabase
           .from('bookmarks')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', user_id)
+          .eq('user_id', uid)
           .eq('category', catRow.name)
         if (cntErr2) return NextResponse.json({ error: cntErr2.message }, { status: 500 })
         if ((count as number) > 0) {
           return NextResponse.json({ error: `Cannot delete category. It contains ${count} bookmarks. Please move or delete the bookmarks first.` }, { status: 400 })
         }
       }
-      const { error: delErr } = await supabase.from('categories').delete().eq('id', id).eq('user_id', user_id)
+      const { error: delErr } = await supabase.from('categories').delete().eq('id', id).eq('user_id', uid)
       if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 })
       return NextResponse.json({ success: true, message: 'Category deleted successfully' })
     } else {

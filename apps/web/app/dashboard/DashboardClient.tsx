@@ -1305,10 +1305,24 @@ export default function Dashboard() {
         ai_category: result.bookmark?.ai_category
       });
       
-      // Reload bookmarks from the database to get the latest data
+      // Reload bookmarks and categories to reflect new category/folder
       await loadBookmarks();
+      try {
+        const res = await fetch('/api/categories');
+        const data = await res.json();
+        if (data?.success && data.categories) {
+          const folders = data.categories.map((category: any) => ({
+            id: `folder-${category.id}`,
+            name: category.name,
+            description: category.description,
+            color: category.color,
+            bookmarkCount: category.bookmarkCount
+          }));
+          setDynamicFolders(folders);
+        }
+      } catch (e) { /* ignore */ }
       
-      console.log('✅ Bookmarks reloaded from database');
+      console.log('✅ Bookmarks and folders reloaded from database');
       setShowAddBookmark(false);
       resetAddBookmarkForm();
       showNotification('Bookmark saved successfully!');
