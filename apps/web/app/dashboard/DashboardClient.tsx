@@ -139,7 +139,7 @@ const Oracle = dynamic(() => import('../../src/components/oracle/Oracle').then(m
 const InfinityBoardBackground = dynamic(() => import('../../src/features/infinity-board/InfinityBoard').then(m => m.InfinityBoardBackground), { ssr: false, loading: () => null })
 const KHV1InfinityBoard = dynamic(() => import('../../src/features/infinity-board/InfinityBoard').then(m => m.KHV1InfinityBoard), { ssr: false, loading: () => <div className="p-4">Loading board…</div> })
 
-import { SyncButton } from '../../src/components/SyncButton'
+import { SyncButton } from '../../components/SyncButton'
 import { getProfilePicture, onProfilePictureChange } from '../../lib/profile-utils'
 
 import { useRealTimeAnalytics } from '../../lib/real-time-analytics'
