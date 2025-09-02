@@ -119,7 +119,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
 import { sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'
-import { useSortable } from '@dnd-kit/sortable'
+import { useSortable as useSortableOrig } from '@dnd-kit/sortable'
 import { CSS as DndCSS } from '@dnd-kit/utilities'
 import dynamic from 'next/dynamic'
 
