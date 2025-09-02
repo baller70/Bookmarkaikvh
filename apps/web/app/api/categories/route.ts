@@ -100,7 +100,7 @@ async function getBookmarkCountForCategory(categoryName: string, userId: string)
   // Fetch categories for relevant scope, then normalize and count in app layer
   const { data, error } = await supabase
     .from('bookmarks')
-    .select('category')
+    .select('category, ai_category')
     .or(orFilter)
 
   if (error) {
@@ -109,7 +109,11 @@ async function getBookmarkCountForCategory(categoryName: string, userId: string)
   }
   const normalize = (s: any) => (typeof s === 'string' ? s.trim().toLowerCase() : '')
   const target = normalize(categoryName)
-  return (data || []).reduce((acc: number, row: any) => acc + (normalize(row.category) === target ? 1 : 0), 0)
+  return (data || []).reduce((acc: number, row: any) => {
+    const c1 = normalize(row.category)
+    const c2 = normalize(row.ai_category)
+    return acc + (c1 === target || c2 === target ? 1 : 0)
+  }, 0)
 }
 
 export async function GET(request: NextRequest) {
