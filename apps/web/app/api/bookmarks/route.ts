@@ -765,12 +765,12 @@ export async function DELETE(request: NextRequest) {
     console.log(`🗑️ Deleting bookmark ${bookmarkId} for user ${userId}`);
     
     if (USE_SUPABASE && supabase) {
-      // Handle both UUID strings and integer IDs
+      // Delete bookmark by id for user-owned OR global (null) records
       const { error } = await supabase
         .from('bookmarks')
         .delete()
         .eq('id', bookmarkId)
-        .eq('user_id', userId);
+        .or(`user_id.eq.${userId},user_id.is.null`)
 
       if (error) {
         console.error('❌ Supabase delete error:', error);
