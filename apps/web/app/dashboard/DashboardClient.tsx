@@ -5,7 +5,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'next/navigation';
 import { useAnalytics } from '../../src/hooks/useAnalytics'
-import { useCategories } from '@/contexts/CategoriesContext' // 1. IMPORT THE HOOK
 
 // Helper function to create a Supabase client
 import { createClient } from '@supabase/supabase-js'
@@ -129,16 +128,24 @@ import {
   useSortable,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { NotificationTab } from '../../src/features/notifications'
-import { TimerTab } from '../../src/features/pomodoro'
-import { MediaHub } from '../../src/features/media'
-import { SimpleBoardCanvas } from '../../src/features/simpleBoard/SimpleBoardCanvas'
-import { FolderHierarchyManager, FolderHierarchyAssignment } from '../../src/components/hierarchy/Hierarchy'
-import { FolderOrgChartView } from '../../src/components/ui/folder-org-chart-view'
-import { FolderCard, type BookmarkWithRelations } from '../../src/components/ui/FolderCard'
-import { FolderFormDialog, type Folder } from '../../src/components/ui/FolderFormDialog'
-import { KanbanView } from '../../src/components/ui/BookmarkKanban'
-import TrelloBoard from '../../src/components/ui/TrelloBoard'
+import dynamic from 'next/dynamic'
+
+const FolderCard = dynamic(() => import('../../src/components/ui/FolderCard').then(m => m.FolderCard), { ssr: false, loading: () => <div /> })
+const FolderFormDialog = dynamic(() => import('../../src/components/ui/FolderFormDialog').then(m => m.FolderFormDialog), { ssr: false, loading: () => <div /> })
+
+const NotificationTab = dynamic(() => import('../../src/features/notifications').then(m => m.NotificationTab), { ssr: false, loading: () => <div /> })
+const TimerTab = dynamic(() => import('../../src/features/pomodoro').then(m => m.TimerTab), { ssr: false, loading: () => <div /> })
+const MediaHub = dynamic(() => import('../../src/features/media').then(m => m.MediaHub), { ssr: false, loading: () => <div /> })
+const SimpleBoardCanvas = dynamic(() => import('../../src/features/simpleBoard/SimpleBoardCanvas').then(m => m.SimpleBoardCanvas), { ssr: false, loading: () => <div /> })
+const FolderOrgChartView = dynamic(() => import('../../src/components/ui/folder-org-chart-view').then(m => m.FolderOrgChartView), { ssr: false, loading: () => <div /> })
+const KanbanView = dynamic(() => import('../../src/components/ui/BookmarkKanban').then(m => m.KanbanView), { ssr: false, loading: () => <div /> })
+const TrelloBoard = dynamic(() => import('../../src/components/ui/TrelloBoard'), { ssr: false, loading: () => <div /> })
+const DnaSearch = dynamic(() => import('../../src/components/dna-profile/dna-search'), { ssr: false, loading: () => <div /> })
+const Oracle = dynamic(() => import('../../src/components/oracle/Oracle'), { ssr: false, loading: () => <div /> })
+
+const InfinityBoardBackground = dynamic(() => import('../../src/features/infinity-board/InfinityBoard').then(m => m.InfinityBoardBackground), { ssr: false, loading: () => null })
+const KHV1InfinityBoard = dynamic(() => import('../../src/features/infinity-board/InfinityBoard').then(m => m.KHV1InfinityBoard), { ssr: false, loading: () => <div className="p-4">Loading board…</div> })
+
 import { SyncButton } from '@/components/SyncButton'
 import { getProfilePicture, onProfilePictureChange } from '@/lib/profile-utils'
 
@@ -157,133 +164,12 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 
 // Import the Perplexity-style search component
-import DnaSearch from '../../src/components/dna-profile/dna-search'
+
 // Import Oracle component
-import Oracle from '../../src/components/oracle/Oracle'
 
 // Custom Infinity Board Background Component (no nodes, just background)
-const InfinityBoardBackground = ({ isActive }: { isActive: boolean }) => {
-  const [nodes] = useNodesState([]);
-  const [edges] = useEdgesState([]);
-
-  return isActive ? (
-    <ReactFlowProvider>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        fitView
-        attributionPosition="bottom-left"
-        className="bg-gray-50"
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={false}
-        panOnDrag={true}
-        zoomOnScroll={true}
-        zoomOnPinch={true}
-        zoomOnDoubleClick={true}
-        onError={(error) => {
-          console.error('❌ InfinityBoardBackground React Flow Error:', error);
-        }}
-      >
-        <Background gap={12} color="#e5e7eb" />
-        <MiniMap position="bottom-left" />
-        <Controls position="bottom-right" />
-      </ReactFlow>
-    </ReactFlowProvider>
-  ) : null;
-};
 
 // HIERARCHY Infinity Board with Full Editing Capabilities - DEFINITIVE SOLUTION
-const KHV1InfinityBoard = ({ folders, bookmarks, onCreateFolder, onAddBookmark, onOpenDetail, isActive, folderAssignments, onHierarchyAssignmentsChange }: {
-  folders: any[];
-  bookmarks: any[];
-  onCreateFolder: () => void;
-  onAddBookmark: () => void;
-  onOpenDetail: (bookmark: any) => void;
-  isActive: boolean;
-  folderAssignments: FolderHierarchyAssignment[];
-  onHierarchyAssignmentsChange: (assignments: FolderHierarchyAssignment[]) => void;
-}) => {
-  const [transform, setTransform] = useState({ x: 0, y: 0, zoom: 1 });
-  
-  return isActive ? (
-    <div className="relative w-full min-h-screen overflow-auto">
-      {/* Background Layer: React Flow for infinity board only */}
-      <div className="absolute inset-0 w-full h-full pointer-events-none">
-        <ReactFlowProvider>
-          <ReactFlow
-            nodes={[]}
-            edges={[]}
-            fitView
-            attributionPosition="bottom-left"
-            className="bg-gray-50"
-            nodesDraggable={false}
-            nodesConnectable={false}
-            elementsSelectable={false}
-            panOnDrag={true}
-            zoomOnScroll={true}
-            zoomOnPinch={true}
-            zoomOnDoubleClick={true}
-            minZoom={0.1}
-            maxZoom={4}
-            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-            onMove={(_, viewport) => {
-              setTransform({
-                x: viewport.x,
-                y: viewport.y,
-                zoom: viewport.zoom
-              });
-            }}
-            onError={(error) => {
-              console.error('❌ KHV1InfinityBoard React Flow Error:', error);
-            }}
-          >
-            <Background gap={12} color="#e5e7eb" />
-            <Controls position="bottom-right" />
-            <MiniMap position="bottom-left" />
-          </ReactFlow>
-        </ReactFlowProvider>
-      </div>
-      
-      {/* Foreground Layer: Fully Interactive Components */}
-      <div 
-        className="relative w-full pointer-events-auto z-10"
-        style={{
-          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`,
-          transformOrigin: '0 0',
-          transition: 'none', // Disable transitions for smooth interaction
-          paddingTop: '40px',
-          paddingLeft: '40px',
-          paddingBottom: '40px',
-          minHeight: 'calc(100vh + 80px)' // Ensure there's room to scroll
-        }}
-      >
-        <div className="w-full max-w-[92vw]">
-          <div className="bg-white/95 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-gray-200/60 w-full min-h-[80vh]">
-            <FolderOrgChartView
-              folders={folders}
-              bookmarks={bookmarks}
-              onCreateFolder={onCreateFolder}
-              onEditFolder={() => {}}
-              onDeleteFolder={() => {}}
-              onAddBookmarkToFolder={() => {}}
-              onDropBookmarkToFolder={() => {}}
-              onBookmarkUpdated={() => {}}
-              onBookmarkDeleted={() => {}}
-              onOpenDetail={onOpenDetail}
-              currentFolderId={null}
-              onFolderNavigate={() => {}}
-              selectedFolder={null}
-              onAddBookmark={onAddBookmark}
-              hierarchyAssignments={folderAssignments}
-              onHierarchyAssignmentsChange={onHierarchyAssignmentsChange}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  ) : null;
-};
 
 // Client-only wrapper to prevent hydration mismatches
 function ClientOnlyDndProvider({ children }: { children: React.ReactNode }) {
@@ -376,7 +262,6 @@ export default function Dashboard() {
   const [arpShowAllSteps, setArpShowAllSteps] = useState(false);
 
   // Dynamic folders based on real bookmark categories
-  const { categories, isLoading: areCategoriesLoading, refreshCategories } = useCategories(); // 2. INITIALIZE THE HOOK
   const [dynamicFolders, setDynamicFolders] = useState<any[]>([]);
   
   // State for opened folder in Folder 2.0
@@ -718,19 +603,46 @@ export default function Dashboard() {
   const [bulkMode, setBulkMode] = useState(false);
   const scrollLockRef = useRef(false);
 
-  // 3. DERIVE FOLDERS FROM THE GLOBAL CONTEXT
+  // Generate dynamic folders from dedicated categories API
   useEffect(() => {
-    if (categories) {
-      const folders = categories.map((category) => ({
-        id: `folder-${category.id}`,
-        name: category.name,
-        description: category.description,
-        color: category.color,
-        bookmarkCount: category.bookmarkCount
-      }));
-      setDynamicFolders(folders);
-    }
-  }, [categories]);
+    const loadDynamicFolders = async () => {
+      try {
+        // Fetch categories from the dedicated categories API
+        console.log('🔄 Loading dynamic folders from categories API...');
+        const response = await fetch(`/api/categories?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+        const data = await response.json();
+        console.log('📁 Initial dynamic folders API response:', data);
+        
+        if (data.success && data.categories) {
+          // Convert categories to folder format
+          const folders = data.categories.map((category: any) => ({
+            id: `folder-${category.id}`,
+            name: category.name,
+            description: category.description,
+            color: category.color,
+            bookmarkCount: category.bookmarkCount
+          }));
+          
+          setDynamicFolders(folders);
+          console.log('📁 Loaded dynamic folders from categories API:', folders);
+        } else {
+          console.log('⚠️ No categories found, using empty folders');
+          setDynamicFolders([]);
+        }
+      } catch (error) {
+        console.error('❌ Error loading dynamic folders:', error);
+        // Fallback to empty folders
+        setDynamicFolders([]);
+      }
+    };
+
+    loadDynamicFolders();
+  }, []); // Load once on component mount
 
   // Reset compact view mode when switching away from compact/list view
   useEffect(() => {
@@ -847,7 +759,6 @@ export default function Dashboard() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
-
   // Available bookmarks that can be added to the workspace
   const availableBookmarks = [
     {
@@ -1146,6 +1057,27 @@ export default function Dashboard() {
     setTimeout(restorePosition, 10)
   }, [selectedBookmarks]);
 
+  // Create folders for hierarchy after bookmarks are loaded
+  const foldersForHierarchyV1 = useMemo(() => {
+    const categories = [...new Set(bookmarks.map((b) => b.category))];
+    return categories.map((cat) => ({
+      id: cat,
+      name: cat,
+      color: '#6b7280',
+      bookmark_count: bookmarks.filter((b) => b.category === cat).length,
+    }));
+  }, [bookmarks]);
+
+  const filteredBookmarks = bookmarks.filter(bookmark => {
+    const matchesSearch = bookmark.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         bookmark.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (Array.isArray(bookmark.tags) && bookmark.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase())))
+    
+    const matchesCategory = selectedCategory === 'all' || bookmark.category.toLowerCase() === selectedCategory.toLowerCase()
+    
+    return matchesSearch && matchesCategory
+  })
+
   // Loading state and empty state handling
   console.log('🟢 Dashboard render: isLoadingBookmarks =', isLoadingBookmarks);
   console.log('🟢 Dashboard render: bookmarks.length =', bookmarks.length);
@@ -1252,10 +1184,35 @@ export default function Dashboard() {
       await loadBookmarks();
       
       // Add a small delay to ensure category is fully created in database
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      console.log('✅✅✅ [DashboardClient] Triggering category refresh via context...');
-      await refreshCategories();
+      try {
+        console.log('🔄 Refreshing categories after bookmark creation...');
+        const res = await fetch(`/api/categories?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+        const data = await res.json();
+        console.log('📁 Categories API response:', data);
+        
+        if (data?.success && data.categories) {
+          const folders = data.categories.map((category: any) => ({
+            id: `folder-${category.id}`,
+            name: category.name,
+            description: category.description,
+            color: category.color,
+            bookmarkCount: category.bookmarkCount
+          }));
+          setDynamicFolders(folders);
+          console.log('✅ Dynamic folders updated:', folders.length, 'categories');
+        } else {
+          console.warn('⚠️ Categories API returned no data or failed:', data);
+        }
+      } catch (e) { 
+        console.error('❌ Error refreshing categories:', e);
+      }
       
       console.log('✅ Bookmarks and folders reloaded from database');
       setShowAddBookmark(false);
@@ -1581,7 +1538,6 @@ export default function Dashboard() {
     setEditingField(null)
     setEditingValue('')
   }
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Only handle special keys if we're in an input field for editing
     const target = e.target as HTMLElement
@@ -1605,7 +1561,6 @@ export default function Dashboard() {
       }
     }
   }
-
   const toggleFavorite = async () => {
     if (!selectedBookmark) return
 
@@ -2345,7 +2300,6 @@ export default function Dashboard() {
       </div>
     </TooltipProvider>
   )
-
   // Enhanced Site Health Component with modal analytics card design
   const SiteHealthComponent = ({ bookmark, onClick, isLoading = false }: { 
     bookmark: any; 
@@ -2994,7 +2948,6 @@ export default function Dashboard() {
       </div>
     )
   }
-
   const CompactBookmarkCard = ({ bookmark }: { bookmark: any }) => (
     <div 
       className="group cursor-pointer"
@@ -3793,7 +3746,6 @@ export default function Dashboard() {
       </div>
     )
   }
-
   // Goal Folder Card component (non-sortable)
   const GoalFolderCard = ({ folder, bookmarkCount, onEdit, onDelete, onAddBookmark, onDrop, onDragOver, onClick }: {
     folder: Folder;
@@ -4566,7 +4518,6 @@ export default function Dashboard() {
       console.error('Bulk delete error:', error)
     }
   }
-
   // Add bulk move function
   const handleBulkMove = async (newCategory: string) => {
     if (selectedBookmarks.length === 0) {

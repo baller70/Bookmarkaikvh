@@ -6,6 +6,8 @@ import { authenticateUser } from '@/lib/auth-utils';
 import { createClient } from '@supabase/supabase-js';
 import { unstable_cache } from 'next/cache';
 
+export const dynamic = 'force-dynamic'; // Prevent caching
+
 const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
 
 // Resolve writable data directory (Vercel allows writes only to /tmp)
@@ -81,75 +83,59 @@ async function loadBookmarks(): Promise<any[]> {
   }
 }
 
-// Helper function to get bookmark counts, cached for 60 seconds
-const getBookmarkCounts = unstable_cache(
-  async (userId: string) => {
-    if (!USE_SUPABASE || !supabase) return new Map<string, number>();
+// Unified function to get bookmark count for a specific category name
+async function getBookmarkCountForCategory(categoryName: string, userId: string): Promise<number> {
+  if (!USE_SUPABASE || !supabase) return 0;
 
-    const { data: bookmarks, error } = await supabase
-      .from('bookmarks')
-      .select('category')
-      .or(`user_id.eq.${userId},user_id.is.null`);
+  const { count, error } = await supabase
+    .from('bookmarks')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('category', categoryName);
 
-    if (error) {
-      console.error('Error fetching bookmark counts:', error);
-      return new Map<string, number>();
-    }
+  if (error) {
+    console.error(`Error counting bookmarks for category ${categoryName}:`, error);
+    return 0;
+  }
 
-    const countMap = new Map<string, number>();
-    if (bookmarks) {
-      bookmarks.forEach((bookmark: any) => {
-        const category = bookmark.category || 'General';
-        countMap.set(category, (countMap.get(category) || 0) + 1);
-      });
-    }
-    return countMap;
-  },
-  ['bookmark-counts'], // Cache key prefix
-  { revalidate: 60 } // Revalidate every 60 seconds
-);
+  return count || 0;
+}
 
 export async function GET(request: NextRequest) {
   try {
     const authResult = await authenticateUser(request);
     const userId = authResult.success && authResult.userId ? authResult.userId : DEV_USER_ID;
-    
+    console.log(`--- NEW GET /api/categories REQUEST for user: ${userId} ---`);
+
     let categoriesWithCounts: any[] = []
 
     if (USE_SUPABASE && supabase) {
+      console.log('Fetching categories from Supabase...');
       const { data: cats, error: catErr } = await supabase
         .from('categories')
         .select('id,name,description,color,created_at,updated_at,user_id')
-        .or(`user_id.eq.${userId},user_id.is.null`);
+        .eq('user_id', userId)
 
       if (catErr) throw new Error(catErr.message);
+      console.log(`Found ${cats?.length || 0} category rows.`);
 
-      const countMap = await getBookmarkCounts(userId);
-      
-      // Deduplicate categories by name, preferring user-specific rows over null user_id
-      const dedupByName = new Map<string, any>()
-      ;(cats || []).forEach((c: any) => {
-        const existing = dedupByName.get(c.name)
-        if (!existing) {
-          dedupByName.set(c.name, c)
-        } else {
-          // Prefer the entry that has a non-null user_id
-          const prefer = existing.user_id ? existing : (c.user_id ? c : existing)
-          dedupByName.set(c.name, prefer)
-        }
-      })
-
-      categoriesWithCounts = Array.from(dedupByName.values()).map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        description: c.description || '',
-        color: c.color || '#3B82F6',
-        bookmarkCount: countMap.get(c.name) || 0,
-        createdAt: c.created_at,
-        updatedAt: c.updated_at
-      }))
+      // Now, get counts for the deduplicated categories
+      categoriesWithCounts = await Promise.all(
+        (cats || []).map(async (c: any) => {
+          const count = await getBookmarkCountForCategory(c.name, userId);
+          return {
+            id: c.id,
+            name: c.name,
+            description: c.description || '',
+            color: c.color || '#3B82F6',
+            bookmarkCount: count,
+            createdAt: c.created_at,
+            updatedAt: c.updated_at,
+          };
+        })
+      );
     } else {
-      return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
     }
     
     return NextResponse.json({
@@ -355,17 +341,7 @@ export async function DELETE(request: NextRequest) {
       }
       
       // Count bookmarks with this category name
-      const { count, error: cntErr } = await supabase
-        .from('bookmarks')
-        .select('id', { count: 'exact', head: true })
-        .or(`user_id.eq.${uid},user_id.is.null`)
-        .eq('category', catRow.name)
-        
-      if (cntErr) {
-        console.error('❌ Error counting bookmarks for category deletion:', cntErr)
-        return NextResponse.json({ error: cntErr.message }, { status: 500 })
-      }
-      
+      const count = await getBookmarkCountForCategory(catRow.name, uid);
       console.log(`🔍 Category "${catRow.name}" (${id}) has ${count} bookmarks`)
       
       if ((count as number) > 0) {

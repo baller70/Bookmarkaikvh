@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useCategories } from '@/contexts/CategoriesContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -49,7 +48,7 @@ const colorOptions = [
 ]
 
 export default function CategoriesPage() {
-  const { categories, isLoading, refreshCategories } = useCategories();
+  const [categories, setCategories] = useState<Category[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -60,13 +59,44 @@ export default function CategoriesPage() {
     color: '#3B82F6'
   })
 
-  // The local state for categories and the useEffect to load them are now REMOVED.
+  // Load categories from dedicated categories API
+  const loadCategories = async () => {
+    try {
+      console.log('🔄 Loading categories from API...');
+      const response = await fetch(`/api/categories?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      const data = await response.json();
+      console.log('📁 Categories API response:', data);
+      
+      if (data.success && data.categories) {
+        setCategories(data.categories);
+        console.log('✅ Loaded categories:', data.categories.length, 'categories');
+        console.log('📋 Category names:', data.categories.map(c => c.name));
+      } else {
+        console.warn('⚠️ Categories API returned no data or failed:', data);
+        setCategories([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading categories:', error);
+      // Fallback to empty array if API fails
+      setCategories([]);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    loadCategories();
+  }, [])
 
   // Auto-refresh on page focus (when user switches back to this tab)
   useEffect(() => {
     const handleFocus = () => {
       console.log('📁 Categories page focused, refreshing...');
-      refreshCategories();
+      loadCategories();
     };
 
     window.addEventListener('focus', handleFocus);
@@ -77,7 +107,7 @@ export default function CategoriesPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       console.log('📁 Auto-refreshing categories...');
-      refreshCategories();
+      loadCategories();
     }, 30000);
 
     return () => clearInterval(interval);
@@ -88,8 +118,7 @@ export default function CategoriesPage() {
     category.description.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleCreateCategory = async (e) => {
-    e.preventDefault();
+  const handleCreateCategory = async () => {
     if (!newCategory.name.trim()) {
       toast({
         title: "Error",
@@ -120,7 +149,8 @@ export default function CategoriesPage() {
       const result = await response.json();
       
       if (result.success) {
-        await refreshCategories(); // Refresh from global context
+        // Reload from server to ensure dedupe and accurate counts
+        await loadCategories()
         setNewCategory({ name: '', description: '', color: '#3B82F6' })
         setIsCreateDialogOpen(false)
         
@@ -141,8 +171,7 @@ export default function CategoriesPage() {
     }
   }
 
-  const handleEditCategory = async (e) => {
-    e.preventDefault();
+  const handleEditCategory = async () => {
     if (!editingCategory || !editingCategory.name.trim()) {
       toast({
         title: "Error",
@@ -174,7 +203,8 @@ export default function CategoriesPage() {
       const result = await response.json();
       
       if (result.success) {
-        await refreshCategories(); // Refresh from global context
+        // Reload from server to ensure dedupe and accurate counts
+        await loadCategories()
         setIsEditDialogOpen(false)
         setEditingCategory(null)
         
@@ -195,7 +225,7 @@ export default function CategoriesPage() {
     }
   }
 
-  const handleDeleteCategory = async (categoryId) => {
+  const handleDeleteCategory = async (categoryId: string) => {
     const category = categories.find(cat => cat.id === categoryId)
     if (category && category.bookmarkCount > 0) {
       toast({
@@ -218,7 +248,8 @@ export default function CategoriesPage() {
       const result = await response.json();
       
       if (result.success) {
-        await refreshCategories(); // Refresh from global context
+        // Reload from server to ensure dedupe and accurate counts
+        await loadCategories()
         toast({
           title: "Success",
           description: "Category deleted successfully"
@@ -278,7 +309,7 @@ export default function CategoriesPage() {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={refreshCategories}
+                onClick={loadCategories}
                 className="flex items-center space-x-2"
               >
                 <RefreshCw className="h-4 w-4" />
