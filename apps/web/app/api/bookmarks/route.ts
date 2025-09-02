@@ -27,6 +27,12 @@ const supabase = USE_SUPABASE ? createClient(
   supabaseKey!
 ) : null;
 
+// Simple UUID v4 check
+function isUuid(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value)
+}
+
 // Direct REST API helper functions (backup for client issues)
 async function directSupabaseInsert(data: any) {
   console.log('🧪 Direct API Debug:');
@@ -448,7 +454,7 @@ export async function POST(request: NextRequest) {
         // Only use columns that actually exist in the Supabase bookmarks table
         // Store under the dev/testing user so reads include it
         const insertPayload = {
-          user_id: userId,
+          user_id: isUuid(userId) ? userId : null,
           title,
           url,
           description: description || ai.summary || '',
@@ -482,8 +488,8 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Handle FK constraint by seeding dev profile then retry once
-          if (insertResult.error.code === '23503' && insertResult.error.message?.includes('bookmarks_user_id_fkey')) {
+          // Handle FK constraint by seeding dev profile then retry once (only when userId is UUID)
+          if (isUuid(userId) && insertResult.error.code === '23503' && insertResult.error.message?.includes('bookmarks_user_id_fkey')) {
             console.log('🧩 Seeding dev profile row to satisfy FK, then retrying insert...');
             try {
               const seed = await supabase
@@ -508,8 +514,14 @@ export async function POST(request: NextRequest) {
               .single();
           }
 
-          // If still failing with FK or RLS, fall back to inserting with user_id = null (dev mode)
-          if (insertResult.error && insertResult.error.code === '23503') {
+          // If still failing with FK or RLS, fall back to inserting with user_id = null (dev/global)
+          if (
+            insertResult.error && (
+              insertResult.error.code === '23503' ||
+              (insertResult.error.message || '').toLowerCase().includes('row-level security') ||
+              insertResult.error.code === '42501'
+            )
+          ) {
             console.log('🔄 Falling back to insert with user_id=null (dev mode)');
             const retryNoUser = await supabase
               .from('bookmarks')
@@ -523,12 +535,17 @@ export async function POST(request: NextRequest) {
                 console.log('🔍 Checking if category exists (fallback path):', catName)
                 
                 // First, check if category already exists (any user_id)
-                const { data: existingCategory } = await supabase
-                  .from('categories')
-                  .select('id, name, user_id')
-                  .eq('name', catName)
-                  .limit(1)
-                  .single()
+                let existingCategory: any = null
+                {
+                  const { data } = await supabase
+                    .from('categories')
+                    .select('id, name, user_id')
+                    .is('user_id', null)
+                    .eq('name', catName)
+                    .limit(1)
+                    .maybeSingle()
+                  existingCategory = data
+                }
                 
                 if (existingCategory) {
                   console.log('✅ Category already exists (fallback path):', catName, 'with user_id:', existingCategory.user_id)
@@ -557,32 +574,53 @@ export async function POST(request: NextRequest) {
         try {
           console.log('🔍 Checking if category exists:', catName)
           
-          // First, check if category already exists (any user_id)
-          const { data: existingCategory } = await supabase
-            .from('categories')
-            .select('id, name, user_id')
-            .eq('name', catName)
-            .limit(1)
-            .single()
+          // First, check if category already exists (prefer user-owned if UUID, otherwise global)
+          let existingCategory: any = null
+          if (isUuid(userId)) {
+            const { data } = await supabase
+              .from('categories')
+              .select('id, name, user_id')
+              .eq('user_id', userId)
+              .eq('name', catName)
+              .limit(1)
+              .maybeSingle()
+            existingCategory = data
+          }
+          if (!existingCategory) {
+            const { data } = await supabase
+              .from('categories')
+              .select('id, name, user_id')
+              .is('user_id', null)
+              .eq('name', catName)
+              .limit(1)
+              .maybeSingle()
+            existingCategory = data
+          }
           
           if (existingCategory) {
             console.log('✅ Category already exists:', catName, 'with user_id:', existingCategory.user_id)
           } else {
             console.log('🆕 Creating new category:', catName)
             
-            // Try with userId first, fallback to null if FK constraint fails
+            // Try with userId (if UUID), fallback to null if FK/RLS fails
             let categoryResult = await supabase
               .from('categories')
               .upsert({
-                user_id: userId,
+                user_id: isUuid(userId) ? userId : null,
                 name: catName,
                 description: '',
                 color: '#3B82F6'
               }, { onConflict: 'user_id,name' })
               
-            if (categoryResult.error && categoryResult.error.code === '23503') {
-              // FK constraint failed, try with null user_id
-              console.log('🔄 Category upsert: FK constraint failed, retrying with null user_id')
+            if (
+              categoryResult.error && (
+                categoryResult.error.code === '23503' ||
+                (categoryResult.error.message || '').toLowerCase().includes('row-level security') ||
+                categoryResult.error.code === '42501'
+              )
+            ) {
+              // FK/RLS constraint failed, try with null user_id
+              console.log('🔄 Category upsert: constraint failed, retrying with null user_id')
               categoryResult = await supabase
                 .from('categories')
                 .upsert({
