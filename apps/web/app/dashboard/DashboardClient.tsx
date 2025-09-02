@@ -118,7 +118,6 @@ import {
   DragEndEvent,
 } from '@dnd-kit/core'
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
@@ -1841,7 +1840,7 @@ export default function Dashboard() {
       const overBookmarkIndex = bookmarks.findIndex((item) => item.id === over.id)
       
       if (activeBookmarkIndex !== -1 && overBookmarkIndex !== -1) {
-        setBookmarks((items) => arrayMove(items, activeBookmarkIndex, overBookmarkIndex))
+        setBookmarks((items) => arrayMoveLocal(items, activeBookmarkIndex, overBookmarkIndex))
         return
       }
 
@@ -1862,7 +1861,7 @@ export default function Dashboard() {
         if (activeGoalIndex !== -1 && overGoalIndex !== -1) {
           console.log('✅ Goal 2.0 Reordering folders from index', activeGoalIndex, 'to index', overGoalIndex)
           setMockGoalFolders((items) => {
-            const newItems = arrayMove(items, activeGoalIndex, overGoalIndex)
+            const newItems = arrayMoveLocal(items, activeGoalIndex, overGoalIndex)
             console.log('🎯 New Goal order:', newItems.map(f => ({ id: f.id, name: f.name })))
             return newItems
           })
@@ -1876,7 +1875,7 @@ export default function Dashboard() {
     const overFolderIndex = dynamicFolders.findIndex((item) => item.id === over.id)
     
     if (activeFolderIndex !== -1 && overFolderIndex !== -1) {
-      setDynamicFolders((items) => arrayMove(items, activeFolderIndex, overFolderIndex))
+      setDynamicFolders((items) => arrayMoveLocal(items, activeFolderIndex, overFolderIndex))
       return
     }
 
@@ -1885,7 +1884,7 @@ export default function Dashboard() {
         const activeIndex = dynamicFolders.findIndex((f) => f.id === active.id)
         const overIndex = dynamicFolders.findIndex((f) => f.id === over.id)
         if (activeIndex !== -1 && overIndex !== -1) {
-          setDynamicFolders((items) => arrayMove(items, activeIndex, overIndex))
+          setDynamicFolders((items) => arrayMoveLocal(items, activeIndex, overIndex))
           return
         }
       }
