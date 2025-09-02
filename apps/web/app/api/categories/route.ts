@@ -97,17 +97,19 @@ async function getBookmarkCountForCategory(categoryName: string, userId: string)
     ? `user_id.eq.${userId},user_id.is.null`
     : 'user_id.is.null'
 
-  const { count, error } = await supabase
+  // Fetch categories for relevant scope, then normalize and count in app layer
+  const { data, error } = await supabase
     .from('bookmarks')
-    .select('id', { count: 'exact', head: true })
-    .ilike('category', categoryName)
+    .select('category')
     .or(orFilter)
 
   if (error) {
     console.error(`Error counting bookmarks for category ${categoryName}:`, error)
     return 0
   }
-  return count || 0
+  const normalize = (s: any) => (typeof s === 'string' ? s.trim().toLowerCase() : '')
+  const target = normalize(categoryName)
+  return (data || []).reduce((acc: number, row: any) => acc + (normalize(row.category) === target ? 1 : 0), 0)
 }
 
 export async function GET(request: NextRequest) {
