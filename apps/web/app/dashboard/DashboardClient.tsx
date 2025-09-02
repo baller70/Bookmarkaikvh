@@ -134,7 +134,7 @@ const FolderCard = dynamic(() => import('../../src/components/ui/FolderCard').th
 const FolderFormDialog = dynamic(() => import('../../src/components/ui/FolderFormDialog').then(m => m.FolderFormDialog), { ssr: false, loading: () => <div /> })
 
 const NotificationTab = dynamic(() => import('../../src/features/notifications').then(m => m.NotificationTab), { ssr: false, loading: () => <div /> })
-const TimerTab = dynamic(() => import('../../src/features/pomodoro').then(m => m.TimerTab), { ssr: false, loading: () => <div /> })
+const TimerTab = dynamic(() => import('../../src/features/pomodoro/components/TimerTab'), { ssr: false, loading: () => <div /> })
 const MediaHub = dynamic(() => import('../../src/features/media').then(m => m.MediaHub), { ssr: false, loading: () => <div /> })
 const SimpleBoardCanvas = dynamic(() => import('../../src/features/simpleBoard/SimpleBoardCanvas').then(m => m.SimpleBoardCanvas), { ssr: false, loading: () => <div /> })
 const FolderOrgChartView = dynamic(() => import('../../src/components/ui/folder-org-chart-view').then(m => m.FolderOrgChartView), { ssr: false, loading: () => <div /> })
@@ -151,25 +151,6 @@ import { getProfilePicture, onProfilePictureChange } from '@/lib/profile-utils'
 
 import { useRealTimeAnalytics } from '@/lib/real-time-analytics'
 import { toast } from 'sonner'
-
-// Import React Flow components for custom background
-import ReactFlow, {
-  ReactFlowProvider,
-  Background,
-  Controls,
-  MiniMap,
-  useNodesState,
-  useEdgesState,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
-
-// Import the Perplexity-style search component
-
-// Import Oracle component
-
-// Custom Infinity Board Background Component (no nodes, just background)
-
-// HIERARCHY Infinity Board with Full Editing Capabilities - DEFINITIVE SOLUTION
 
 // Client-only wrapper to prevent hydration mismatches
 function ClientOnlyDndProvider({ children }: { children: React.ReactNode }) {
@@ -454,8 +435,6 @@ export default function Dashboard() {
     'Revenue Generated'
   ];
 
-  // Removed isClient useEffect - not needed for static dashboard
-
   // Load and persist lightweight chart preferences via Supabase API (/api/save)
   useEffect(() => {
     const loadPrefs = async () => {
@@ -651,8 +630,6 @@ export default function Dashboard() {
       setSelectedFolder(null)
     }
   }, [viewMode])
-
-  // Removed client-side effect - not needed
 
   // Session recovery for viewing time tracking
   useEffect(() => {
@@ -4652,7 +4629,7 @@ export default function Dashboard() {
 
           {/* Bulk Actions Toolbar - Enhanced visibility */}
           {selectedBookmarks.length > 0 && (
-            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg shadow-md">
+            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-lg shadow-md hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <Button
