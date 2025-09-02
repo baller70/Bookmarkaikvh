@@ -121,6 +121,8 @@ import { useSortable as useSortableOrig } from '@dnd-kit/sortable'
 import { CSS as DndCSS } from '@dnd-kit/utilities'
 import dynamic from 'next/dynamic'
 
+const useSortable = useSortableOrig
+
 const FolderCard = dynamic(() => import('../../src/components/ui/FolderCard').then(m => m.FolderCard), { ssr: false, loading: () => <div /> })
 const FolderFormDialog = dynamic(() => import('../../src/components/ui/FolderFormDialog').then(m => m.FolderFormDialog), { ssr: false, loading: () => <div /> })
 
