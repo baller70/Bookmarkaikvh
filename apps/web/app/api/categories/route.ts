@@ -109,10 +109,10 @@ async function getBookmarkCountForCategory(categoryName: string, userId: string)
   }
   const normalize = (s: any) => (typeof s === 'string' ? s.trim().toLowerCase() : '')
   const target = normalize(categoryName)
-  // Match the same logic the UI uses when displaying a bookmark's category:
-  // effective = category || ai_category
+  // Match the UI: prefer AI category when present
+  // effective = ai_category || category
   return (data || []).reduce((acc: number, row: any) => {
-    const effective = normalize(row.category) || normalize(row.ai_category)
+    const effective = normalize(row.ai_category) || normalize(row.category)
     return acc + (effective === target ? 1 : 0)
   }, 0)
 }
