@@ -93,19 +93,16 @@ async function loadBookmarks(): Promise<any[]> {
 async function getBookmarkCountForCategory(categoryName: string, userId: string): Promise<number> {
   if (!USE_SUPABASE || !supabase) return 0
 
-  let query = supabase
+  const orFilter = isUuid(userId)
+    ? `user_id.eq.${userId},user_id.is.null`
+    : 'user_id.is.null'
+
+  const { count, error } = await supabase
     .from('bookmarks')
     .select('id', { count: 'exact', head: true })
     .eq('category', categoryName)
+    .or(orFilter)
 
-  // If the caller's userId is not a UUID (e.g., Clerk user id), treat as global/null-owned bookmarks
-  if (isUuid(userId)) {
-    query = query.eq('user_id', userId)
-  } else {
-    query = query.is('user_id', null)
-  }
-
-  const { count, error } = await query
   if (error) {
     console.error(`Error counting bookmarks for category ${categoryName}:`, error)
     return 0
