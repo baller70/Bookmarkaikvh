@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { toast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase'
 import { 
   Plus, 
   Edit2, 
@@ -111,6 +112,21 @@ export default function CategoriesPage() {
     }, 30000);
 
     return () => clearInterval(interval);
+  }, [])
+
+  // Live updates: subscribe to Supabase Realtime on bookmarks table
+  useEffect(() => {
+    const channel = supabase
+      .channel('categories-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookmarks' }, () => {
+        console.log('🟢 Realtime: bookmarks changed → refreshing categories')
+        loadCategories()
+      })
+      .subscribe()
+
+    return () => {
+      try { supabase.removeChannel(channel) } catch {}
+    }
   }, [])
 
   const filteredCategories = categories.filter(category =>
