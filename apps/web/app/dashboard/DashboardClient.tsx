@@ -127,7 +127,7 @@ const FolderFormDialog = dynamic(() => import('../../src/components/ui/FolderFor
 
 const NotificationTab = dynamic(() => import('../../src/features/notifications').then(m => m.NotificationTab), { ssr: false, loading: () => <div /> })
 const TimerTab = dynamic(() => import('../../src/features/pomodoro/components/TimerTab').then(m => m.default), { ssr: false, loading: () => <div /> })
-const MediaHub = dynamic(() => import('../../src/features/media/components/MediaHub').then(m => m.MediaHub), { ssr: false, loading: () => <div /> })
+const MediaHub = dynamic(() => import('../../src/features/media').then(m => m.MediaHub), { ssr: false, loading: () => <div /> })
 const SimpleBoardCanvas = dynamic(() => import('../../src/features/simpleBoard/SimpleBoardCanvas').then(m => m.SimpleBoardCanvas), { ssr: false, loading: () => <div /> })
 const FolderOrgChartView = dynamic(() => import('../../src/components/ui/folder-org-chart-view').then(m => m.FolderOrgChartView), { ssr: false, loading: () => <div /> })
 const KanbanView = dynamic(() => import('../../src/components/ui/BookmarkKanban').then(m => m.KanbanView), { ssr: false, loading: () => <div /> })
