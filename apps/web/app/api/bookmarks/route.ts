@@ -451,6 +451,18 @@ export async function POST(request: NextRequest) {
           console.log('🚫 AI analysis disabled or not needed');
         }
 
+        // Decide final category: prefer AI category when the provided category is a generic/default bucket
+        const isDefaultBucket = (s?: string) => {
+          const v = String(s || '').trim().toLowerCase()
+          return v === 'general' || v === 'development' || v === 'uncategorized' || v === 'misc' || v === 'other'
+        }
+        let finalCategory = category
+        if (!finalCategory && ai.category) {
+          finalCategory = ai.category
+        } else if (isDefaultBucket(finalCategory) && ai.category) {
+          finalCategory = ai.category
+        }
+
         // Only use columns that actually exist in the Supabase bookmarks table
         // Store under the dev/testing user so reads include it
         const insertPayload = {
@@ -461,7 +473,7 @@ export async function POST(request: NextRequest) {
           ai_summary: ai.summary || null,
           ai_tags: ai.tags || [],
           ai_category: ai.category || null,
-          category: category || ai.category || 'General',
+          category: finalCategory || 'General',
           // folder_id can be null for now since it's optional
           folder_id: null
         };
@@ -629,6 +641,10 @@ export async function POST(request: NextRequest) {
                   description: '',
                   color: '#3B82F6'
                 }, { onConflict: 'user_id,name' })
+              // After creating new category, proactively touch GET /api/categories by computing count once to warm cache (no-op response)
+              try {
+                await getBookmarkCountForCategory(catName, String(insertPayload.user_id || ''))
+              } catch {}
             }
             
             if (categoryResult.error) {
