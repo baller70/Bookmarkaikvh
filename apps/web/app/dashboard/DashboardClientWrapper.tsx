@@ -2,11 +2,11 @@
 
 import dynamic from 'next/dynamic'
 
-const DashboardSimple = dynamic(() => import('./DashboardSimple'), {
+const DashboardClient = dynamic(() => import('./DashboardClient'), {
   ssr: false,
   loading: () => <div className="p-10">Loading dashboard...</div>,
 })
 
 export default function DashboardClientWrapper() {
-  return <DashboardSimple />
+  return <DashboardClient />
 }

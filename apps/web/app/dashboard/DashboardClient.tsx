@@ -13,18 +13,18 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 // Force dynamic rendering - prevent static generation  
 export const dynamic = 'force-dynamic'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu'
+import { Button } from '../../src/components/ui/button'
+import { Input } from '../../src/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../src/components/ui/card'
+import { Label } from '../../src/components/ui/label'
+import { Avatar, AvatarFallback, AvatarImage } from '../../src/components/ui/avatar'
+import { Checkbox } from '../../src/components/ui/checkbox'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../src/components/ui/dialog'
+import { Textarea } from '../../src/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../src/components/ui/select'
+import { Switch } from '../../src/components/ui/switch'
+import { Badge } from '../../src/components/ui/badge'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '../../src/components/ui/dropdown-menu'
 import { BookmarkManager } from '../../components/bookmarks/BookmarkManager'
 
 import { 
@@ -106,8 +106,8 @@ import {
   AlertTriangle,
   AlertCircle
 } from 'lucide-react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../src/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../src/components/ui/tooltip'
 import {
   DndContext,
   closestCenter,
@@ -118,8 +118,9 @@ import {
   DragEndEvent,
 } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
-import { sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy, arrayMove, useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'
+import { useSortable as useSortableOrig } from '@dnd-kit/sortable'
+import { CSS as DndCSS } from '@dnd-kit/utilities'
 import dynamic from 'next/dynamic'
 
 const FolderCard = dynamic(() => import('../../src/components/ui/FolderCard').then(m => m.FolderCard), { ssr: false, loading: () => <div /> })
@@ -127,7 +128,7 @@ const FolderFormDialog = dynamic(() => import('../../src/components/ui/FolderFor
 
 const NotificationTab = dynamic(() => import('../../src/features/notifications').then(m => m.NotificationTab), { ssr: false, loading: () => <div /> })
 const TimerTab = dynamic(() => import('../../src/features/pomodoro/components/TimerTab').then(m => m.default), { ssr: false, loading: () => <div /> })
-const MediaHub = dynamic(() => import('../../src/features/media').then(m => m.MediaHub), { ssr: false, loading: () => <div /> })
+const MediaHub = dynamic(() => import('../../src/features/media/components/MediaHub').then(m => m.MediaHub), { ssr: false, loading: () => <div /> })
 const SimpleBoardCanvas = dynamic(() => import('../../src/features/simpleBoard/SimpleBoardCanvas').then(m => m.SimpleBoardCanvas), { ssr: false, loading: () => <div /> })
 const FolderOrgChartView = dynamic(() => import('../../src/components/ui/folder-org-chart-view').then(m => m.FolderOrgChartView), { ssr: false, loading: () => <div /> })
 const KanbanView = dynamic(() => import('../../src/components/ui/BookmarkKanban').then(m => m.KanbanView), { ssr: false, loading: () => <div /> })
@@ -138,10 +139,10 @@ const Oracle = dynamic(() => import('../../src/components/oracle/Oracle').then(m
 const InfinityBoardBackground = dynamic(() => import('../../src/features/infinity-board/InfinityBoard').then(m => m.InfinityBoardBackground), { ssr: false, loading: () => null })
 const KHV1InfinityBoard = dynamic(() => import('../../src/features/infinity-board/InfinityBoard').then(m => m.KHV1InfinityBoard), { ssr: false, loading: () => <div className="p-4">Loading board…</div> })
 
-import { SyncButton } from '@/components/SyncButton'
-import { getProfilePicture, onProfilePictureChange } from '@/lib/profile-utils'
+import { SyncButton } from '../../src/components/SyncButton'
+import { getProfilePicture, onProfilePictureChange } from '../../lib/profile-utils'
 
-import { useRealTimeAnalytics } from '@/lib/real-time-analytics'
+import { useRealTimeAnalytics } from '../../lib/real-time-analytics'
 import { toast } from 'sonner'
 
 // Client-only wrapper to prevent hydration mismatches
@@ -1833,7 +1834,7 @@ export default function Dashboard() {
       const overBookmarkIndex = bookmarks.findIndex((item) => item.id === over.id)
       
       if (activeBookmarkIndex !== -1 && overBookmarkIndex !== -1) {
-        setBookmarks((items) => arrayMove(items, activeBookmarkIndex, overBookmarkIndex))
+        setBookmarks((items) => arrayMoveLocal(items, activeBookmarkIndex, overBookmarkIndex))
         return
       }
 
@@ -1854,7 +1855,7 @@ export default function Dashboard() {
         if (activeGoalIndex !== -1 && overGoalIndex !== -1) {
           console.log('✅ Goal 2.0 Reordering folders from index', activeGoalIndex, 'to index', overGoalIndex)
           setMockGoalFolders((items) => {
-            const newItems = arrayMove(items, activeGoalIndex, overGoalIndex)
+            const newItems = arrayMoveLocal(items, activeGoalIndex, overGoalIndex)
             console.log('🎯 New Goal order:', newItems.map(f => ({ id: f.id, name: f.name })))
             return newItems
           })
@@ -1868,7 +1869,7 @@ export default function Dashboard() {
     const overFolderIndex = dynamicFolders.findIndex((item) => item.id === over.id)
     
     if (activeFolderIndex !== -1 && overFolderIndex !== -1) {
-      setDynamicFolders((items) => arrayMove(items, activeFolderIndex, overFolderIndex))
+      setDynamicFolders((items) => arrayMoveLocal(items, activeFolderIndex, overFolderIndex))
       return
     }
 
@@ -1877,7 +1878,7 @@ export default function Dashboard() {
         const activeIndex = dynamicFolders.findIndex((f) => f.id === active.id)
         const overIndex = dynamicFolders.findIndex((f) => f.id === over.id)
         if (activeIndex !== -1 && overIndex !== -1) {
-          setDynamicFolders((items) => arrayMove(items, activeIndex, overIndex))
+          setDynamicFolders((items) => arrayMoveLocal(items, activeIndex, overIndex))
           return
         }
       }
@@ -2495,7 +2496,7 @@ export default function Dashboard() {
     } = useSortable({ id: bookmark.id })
 
     const style = {
-      transform: CSS.Transform.toString(transform),
+      transform: toTransformString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -2905,7 +2906,7 @@ export default function Dashboard() {
     } = useSortable({ id: bookmark.id })
 
     const style = {
-      transform: CSS.Transform.toString(transform),
+      transform: toTransformString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -3234,7 +3235,7 @@ export default function Dashboard() {
     } = useSortable({ id })
 
     const style = {
-      transform: CSS.Transform.toString(transform),
+      transform: toTransformString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -3265,7 +3266,7 @@ export default function Dashboard() {
     } = useSortable({ id })
 
     const style = {
-      transform: CSS.Transform.toString(transform),
+      transform: toTransformString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -3295,7 +3296,7 @@ export default function Dashboard() {
     } = useSortable({ id: bookmark.id })
 
     const style = {
-      transform: CSS.Transform.toString(transform),
+      transform: toTransformString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -3529,7 +3530,7 @@ export default function Dashboard() {
     } = useSortable({ id: bookmark.id })
 
     const style = {
-      transform: CSS.Transform.toString(transform),
+      transform: toTransformString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -3593,7 +3594,7 @@ export default function Dashboard() {
     } = useSortable({ id: bookmark.id })
 
     const style = {
-      transform: CSS.Transform.toString(transform),
+      transform: toTransformString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
     }
@@ -3676,7 +3677,7 @@ export default function Dashboard() {
     } = useSortable({ id: folder.id })
 
     const style = {
-      transform: CSS.Transform.toString(transform),
+      transform: toTransformString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
     }
@@ -3839,7 +3840,7 @@ export default function Dashboard() {
     } = useSortable({ id: folder.id })
 
     const style = {
-      transform: CSS.Transform.toString(transform),
+      transform: toTransformString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
     }
