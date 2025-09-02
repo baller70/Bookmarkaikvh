@@ -68,6 +68,12 @@ async function saveCategories(categories: Category[]): Promise<void> {
   }
 }
 
+// Simple UUID v4 format check (8-4-4-4-12 hex)
+function isUuid(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value)
+}
+
 // Load bookmarks to get actual bookmark counts per category
 async function loadBookmarks(): Promise<any[]> {
   try {
@@ -85,20 +91,26 @@ async function loadBookmarks(): Promise<any[]> {
 
 // Unified function to get bookmark count for a specific category name
 async function getBookmarkCountForCategory(categoryName: string, userId: string): Promise<number> {
-  if (!USE_SUPABASE || !supabase) return 0;
+  if (!USE_SUPABASE || !supabase) return 0
 
-  const { count, error } = await supabase
+  let query = supabase
     .from('bookmarks')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('category', categoryName);
+    .eq('category', categoryName)
 
-  if (error) {
-    console.error(`Error counting bookmarks for category ${categoryName}:`, error);
-    return 0;
+  // If the caller's userId is not a UUID (e.g., Clerk user id), treat as global/null-owned bookmarks
+  if (isUuid(userId)) {
+    query = query.eq('user_id', userId)
+  } else {
+    query = query.is('user_id', null)
   }
 
-  return count || 0;
+  const { count, error } = await query
+  if (error) {
+    console.error(`Error counting bookmarks for category ${categoryName}:`, error)
+    return 0
+  }
+  return count || 0
 }
 
 export async function GET(request: NextRequest) {
@@ -110,19 +122,36 @@ export async function GET(request: NextRequest) {
     let categoriesWithCounts: any[] = []
 
     if (USE_SUPABASE && supabase) {
-      console.log('Fetching categories from Supabase...');
-      const { data: cats, error: catErr } = await supabase
+      console.log('Fetching categories from Supabase...')
+
+      // Fetch user-owned categories if userId is a valid UUID
+      let userCats: any[] = []
+      if (isUuid(userId)) {
+        const { data: catsU, error: errU } = await supabase
+          .from('categories')
+          .select('id,name,description,color,created_at,updated_at,user_id')
+          .eq('user_id', userId)
+        if (errU) throw new Error(errU.message)
+        userCats = catsU || []
+      }
+
+      // Also fetch global categories (user_id is null) to support non-UUID auth (e.g., Clerk)
+      const { data: catsN, error: errN } = await supabase
         .from('categories')
         .select('id,name,description,color,created_at,updated_at,user_id')
-        .eq('user_id', userId)
+        .is('user_id', null)
+      if (errN) throw new Error(errN.message)
 
-      if (catErr) throw new Error(catErr.message);
-      console.log(`Found ${cats?.length || 0} category rows.`);
+      // Deduplicate by name, preferring user-specific category over global
+      const byName = new Map<string, any>()
+      for (const c of catsN || []) byName.set(c.name, c)
+      for (const c of userCats) byName.set(c.name, c)
+      const cats = Array.from(byName.values())
+      console.log(`Found ${cats?.length || 0} category rows after merge.`)
 
-      // Now, get counts for the deduplicated categories
       categoriesWithCounts = await Promise.all(
         (cats || []).map(async (c: any) => {
-          const count = await getBookmarkCountForCategory(c.name, userId);
+          const count = await getBookmarkCountForCategory(c.name, userId)
           return {
             id: c.id,
             name: c.name,
@@ -131,11 +160,11 @@ export async function GET(request: NextRequest) {
             bookmarkCount: count,
             createdAt: c.created_at,
             updatedAt: c.updated_at,
-          };
+          }
         })
-      );
+      )
     } else {
-      return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
     }
     
     return NextResponse.json({
@@ -174,23 +203,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Try Supabase first, then fallback to file storage
+    // Try Supabase first
     if (USE_SUPABASE && supabase) {
       try {
-        const { data: existing, error: existErr } = await supabase
-          .from('categories')
-          .select('id')
-          .eq('user_id', uid)
-          .ilike('name', name)
-          .limit(1)
-        if (existErr) throw existErr
-        if (existing && existing.length > 0) {
-          return NextResponse.json({ error: 'Category already exists' }, { status: 400 })
+        // If uid is not a UUID (e.g., Clerk id), avoid filtering by user_id and insert as global
+        if (isUuid(uid)) {
+          const { data: existing, error: existErr } = await supabase
+            .from('categories')
+            .select('id')
+            .eq('user_id', uid)
+            .ilike('name', name)
+            .limit(1)
+          if (existErr) throw existErr
+          if (existing && existing.length > 0) {
+            return NextResponse.json({ error: 'Category already exists' }, { status: 400 })
+          }
+        } else {
+          const { data: existingGlobal, error: existErrGlobal } = await supabase
+            .from('categories')
+            .select('id')
+            .is('user_id', null)
+            .ilike('name', name)
+            .limit(1)
+          if (existErrGlobal) throw existErrGlobal
+          if (existingGlobal && existingGlobal.length > 0) {
+            return NextResponse.json({ error: 'Category already exists' }, { status: 400 })
+          }
         }
-        // Try insert with user_id, fallback to null if FK constraint fails
+
+        // Try insert: use uid if UUID, otherwise insert as global (user_id null)
         let insertResult = await supabase
           .from('categories')
-          .insert([{ user_id: uid, name, description: description || '', color: color || '#3B82F6' }])
+          .insert([{ user_id: isUuid(uid) ? uid : null, name, description: description || '', color: color || '#3B82F6' }])
           .select('id,name,description,color,created_at,updated_at')
           .single()
           
