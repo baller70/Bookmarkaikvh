@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { authenticateUser } from '@/lib/auth-utils';
 import { createClient } from '@supabase/supabase-js';
+import { unstable_cache } from 'next/cache';
 
 const DEV_USER_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -80,6 +81,34 @@ async function loadBookmarks(): Promise<any[]> {
   }
 }
 
+// Helper function to get bookmark counts, cached for 60 seconds
+const getBookmarkCounts = unstable_cache(
+  async (userId: string) => {
+    if (!USE_SUPABASE || !supabase) return new Map<string, number>();
+
+    const { data: bookmarks, error } = await supabase
+      .from('bookmarks')
+      .select('category')
+      .or(`user_id.eq.${userId},user_id.is.null`);
+
+    if (error) {
+      console.error('Error fetching bookmark counts:', error);
+      return new Map<string, number>();
+    }
+
+    const countMap = new Map<string, number>();
+    if (bookmarks) {
+      bookmarks.forEach((bookmark: any) => {
+        const category = bookmark.category || 'General';
+        countMap.set(category, (countMap.get(category) || 0) + 1);
+      });
+    }
+    return countMap;
+  },
+  ['bookmark-counts'], // Cache key prefix
+  { revalidate: 60 } // Revalidate every 60 seconds
+);
+
 export async function GET(request: NextRequest) {
   try {
     const authResult = await authenticateUser(request);
@@ -88,31 +117,15 @@ export async function GET(request: NextRequest) {
     let categoriesWithCounts: any[] = []
 
     if (USE_SUPABASE && supabase) {
-      // Supabase path: categories table + count bookmarks per category
       const { data: cats, error: catErr } = await supabase
         .from('categories')
         .select('id,name,description,color,created_at,updated_at,user_id')
-        .or(`user_id.eq.${userId},user_id.is.null`)
+        .or(`user_id.eq.${userId},user_id.is.null`);
 
-      if (catErr) throw new Error(catErr.message)
+      if (catErr) throw new Error(catErr.message);
 
-      // Get bookmarks to count by category manually
-      const { data: bookmarks, error: cntErr } = await supabase
-        .from('bookmarks')
-        .select('category')
-        .or(`user_id.eq.${userId},user_id.is.null`)
-
-      if (cntErr) throw new Error(cntErr.message)
+      const countMap = await getBookmarkCounts(userId);
       
-      // Count bookmarks by category manually
-      const countMap = new Map<string, number>()
-      if (bookmarks) {
-        bookmarks.forEach((bookmark: any) => {
-          const category = bookmark.category || 'General'
-          countMap.set(category, (countMap.get(category) || 0) + 1)
-        })
-      }
-
       // Deduplicate categories by name, preferring user-specific rows over null user_id
       const dedupByName = new Map<string, any>()
       ;(cats || []).forEach((c: any) => {
