@@ -118,9 +118,8 @@ import {
   DragEndEvent,
 } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
-import { sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy } from '@dnd-kit/sortable'
-import { useSortable as useSortableOrig } from '@dnd-kit/sortable'
-import { CSS as DndCSS } from '@dnd-kit/utilities'
+import { sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy, arrayMove, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import dynamic from 'next/dynamic'
 
 const FolderCard = dynamic(() => import('../../src/components/ui/FolderCard').then(m => m.FolderCard), { ssr: false, loading: () => <div /> })
@@ -1834,7 +1833,7 @@ export default function Dashboard() {
       const overBookmarkIndex = bookmarks.findIndex((item) => item.id === over.id)
       
       if (activeBookmarkIndex !== -1 && overBookmarkIndex !== -1) {
-        setBookmarks((items) => arrayMoveLocal(items, activeBookmarkIndex, overBookmarkIndex))
+        setBookmarks((items) => arrayMove(items, activeBookmarkIndex, overBookmarkIndex))
         return
       }
 
@@ -1855,7 +1854,7 @@ export default function Dashboard() {
         if (activeGoalIndex !== -1 && overGoalIndex !== -1) {
           console.log('✅ Goal 2.0 Reordering folders from index', activeGoalIndex, 'to index', overGoalIndex)
           setMockGoalFolders((items) => {
-            const newItems = arrayMoveLocal(items, activeGoalIndex, overGoalIndex)
+            const newItems = arrayMove(items, activeGoalIndex, overGoalIndex)
             console.log('🎯 New Goal order:', newItems.map(f => ({ id: f.id, name: f.name })))
             return newItems
           })
@@ -1869,7 +1868,7 @@ export default function Dashboard() {
     const overFolderIndex = dynamicFolders.findIndex((item) => item.id === over.id)
     
     if (activeFolderIndex !== -1 && overFolderIndex !== -1) {
-      setDynamicFolders((items) => arrayMoveLocal(items, activeFolderIndex, overFolderIndex))
+      setDynamicFolders((items) => arrayMove(items, activeFolderIndex, overFolderIndex))
       return
     }
 
@@ -1878,7 +1877,7 @@ export default function Dashboard() {
         const activeIndex = dynamicFolders.findIndex((f) => f.id === active.id)
         const overIndex = dynamicFolders.findIndex((f) => f.id === over.id)
         if (activeIndex !== -1 && overIndex !== -1) {
-          setDynamicFolders((items) => arrayMoveLocal(items, activeIndex, overIndex))
+          setDynamicFolders((items) => arrayMove(items, activeIndex, overIndex))
           return
         }
       }
@@ -2496,7 +2495,7 @@ export default function Dashboard() {
     } = useSortable({ id: bookmark.id })
 
     const style = {
-      transform: toTransformString(transform),
+      transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -2906,7 +2905,7 @@ export default function Dashboard() {
     } = useSortable({ id: bookmark.id })
 
     const style = {
-      transform: toTransformString(transform),
+      transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -3235,7 +3234,7 @@ export default function Dashboard() {
     } = useSortable({ id })
 
     const style = {
-      transform: toTransformString(transform),
+      transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -3266,7 +3265,7 @@ export default function Dashboard() {
     } = useSortable({ id })
 
     const style = {
-      transform: toTransformString(transform),
+      transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -3296,7 +3295,7 @@ export default function Dashboard() {
     } = useSortable({ id: bookmark.id })
 
     const style = {
-      transform: toTransformString(transform),
+      transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -3530,7 +3529,7 @@ export default function Dashboard() {
     } = useSortable({ id: bookmark.id })
 
     const style = {
-      transform: toTransformString(transform),
+      transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
       zIndex: isDragging ? 1000 : 1,
@@ -3594,7 +3593,7 @@ export default function Dashboard() {
     } = useSortable({ id: bookmark.id })
 
     const style = {
-      transform: toTransformString(transform),
+      transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
     }
@@ -3677,7 +3676,7 @@ export default function Dashboard() {
     } = useSortable({ id: folder.id })
 
     const style = {
-      transform: toTransformString(transform),
+      transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
     }
@@ -3840,7 +3839,7 @@ export default function Dashboard() {
     } = useSortable({ id: folder.id })
 
     const style = {
-      transform: toTransformString(transform),
+      transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
     }
