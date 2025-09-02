@@ -10,8 +10,6 @@ import { useAnalytics } from '../../src/hooks/useAnalytics'
 import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 
-// Force dynamic rendering - prevent static generation  
-export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { Button } from '../../src/components/ui/button'
 import { Input } from '../../src/components/ui/input'
