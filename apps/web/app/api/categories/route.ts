@@ -100,7 +100,7 @@ async function getBookmarkCountForCategory(categoryName: string, userId: string)
   const { count, error } = await supabase
     .from('bookmarks')
     .select('id', { count: 'exact', head: true })
-    .eq('category', categoryName)
+    .ilike('category', categoryName)
     .or(orFilter)
 
   if (error) {
