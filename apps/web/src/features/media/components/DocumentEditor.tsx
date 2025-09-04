@@ -25,7 +25,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { RichTextEditor } from './RichTextEditor';
+import { NovelEditor } from './NovelEditor';
 import { useMediaLibrary } from '../hooks/useMediaLibrary';
 // import { CommentSection } from '../../comments';
 import { RichDocument, DocumentCollaborator } from '../types';
@@ -34,10 +34,18 @@ import { formatDate } from '../utils';
 interface DocumentEditorProps {
   documentId: string;
   onBack: () => void;
+  documents?: RichDocument[];
 }
 
-export function DocumentEditor({ documentId, onBack }: DocumentEditorProps) {
-  const { documents, updateDocument, filteredFiles } = useMediaLibrary();
+export function DocumentEditor({ documentId, onBack, documents: propDocuments }: DocumentEditorProps) {
+  const { documents: hookDocuments, updateDocument, filteredFiles } = useMediaLibrary();
+  
+  // Debug: Log filtered files
+  console.log('🔍 DocumentEditor: Filtered files count:', filteredFiles.length);
+  if (filteredFiles.length > 0) {
+    console.log('🔍 DocumentEditor: First filtered file:', filteredFiles[0]);
+  }
+  const documents = propDocuments || hookDocuments;
   const [document, setDocument] = useState<RichDocument | null>(null);
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -67,35 +75,45 @@ export function DocumentEditor({ documentId, onBack }: DocumentEditorProps) {
 
     setIsSaving(true);
     
-    // Simulate saving delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const saveTime = new Date();
-    updateDocument(document.id, {
-      title,
-      tags,
-      isPublic,
-      content: document.content,
-      updatedAt: saveTime
-    });
+    try {
+      const saveTime = new Date();
+      await updateDocument(document.id, {
+        title,
+        tags,
+        isPublic,
+        content: document.content,
+        updatedAt: saveTime
+      });
 
-    setLastSaved(saveTime);
-    setIsSaving(false);
+      setLastSaved(saveTime);
+      console.log('✅ Document saved successfully');
+    } catch (error) {
+      console.error('❌ Failed to save document:', error);
+      // Optionally show error toast
+      // toast.error('Failed to save document');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleContentChange = (content: any[]) => {
+  const handleContentChange = async (content: any[]) => {
     console.log('Content changed:', content);
     if (document) {
       const updatedDocument = { ...document, content };
       setDocument(updatedDocument);
       
       // Auto-save the content immediately
-      updateDocument(document.id, {
-        content: content,
-        updatedAt: new Date()
-      });
-      
-      console.log('Document updated with new content');
+      try {
+        await updateDocument(document.id, {
+          content: content,
+          updatedAt: new Date()
+        });
+        console.log('✅ Document content saved successfully');
+      } catch (error) {
+        console.error('❌ Failed to save document content:', error);
+        // Optionally show a toast notification
+        // toast.error('Failed to save changes');
+      }
     }
   };
 
@@ -128,9 +146,9 @@ export function DocumentEditor({ documentId, onBack }: DocumentEditorProps) {
   }
 
   return (
-    <div className="h-full flex">
+    <div className="h-full">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex flex-col h-full">
         {/* Header */}
         <div className="border-b border-gray-200 p-4">
           <div className="flex items-center justify-between mb-4">
@@ -254,15 +272,13 @@ export function DocumentEditor({ documentId, onBack }: DocumentEditorProps) {
 
         {/* Editor */}
         <div className="flex-1 overflow-auto">
-          <div className="max-w-4xl mx-auto p-8">
-            <RichTextEditor
+          <div className="h-full p-6">
+            <NovelEditor
               content={document.content}
               onChange={handleContentChange}
+              className="h-full"
+              placeholder="Start writing your document... Press '/' for AI-powered commands"
               mediaFiles={filteredFiles}
-              onMediaEmbed={(type) => {
-                // Handle media embedding from media library
-                console.log('Embed media type:', type);
-              }}
             />
           </div>
         </div>
@@ -281,24 +297,6 @@ export function DocumentEditor({ documentId, onBack }: DocumentEditorProps) {
               )}
               <span>Auto-save enabled</span>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Comments Sidebar */}
-      <div className="w-96 border-l border-gray-200 flex flex-col">
-        <div className="flex-1 overflow-hidden">
-          {/* Temporarily disabled CommentSection
-          <CommentSection
-            entityType="document"
-            entityId={document.id}
-            title="Document Comments"
-            showHeader={true}
-            allowNewComments={true}
-          />
-          */}
-          <div className="p-4 text-center text-gray-500">
-            Comments temporarily disabled
           </div>
         </div>
       </div>

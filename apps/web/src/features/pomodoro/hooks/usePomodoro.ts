@@ -85,23 +85,9 @@ const MOCK_TASKS: Task[] = [
   }
 ];
 
-const MOCK_TASK_LISTS: TaskList[] = [
-  {
-    id: '1',
-    name: 'Work Tasks',
-    description: 'Professional work and project tasks',
-    color: '#3B82F6',
-    taskIds: ['1', '2', '3'],
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-16'),
-    isArchived: false,
-    isActiveList: true,
-    estimatedDuration: 8,
-    completedTasks: 1
-  }
-];
+const MOCK_TASK_LISTS: TaskList[] = [];
 
-export const usePomodoro = () => {
+export const usePomodoro = ({ bookmarkId }: { bookmarkId?: string } = {}) => {
   // State management
   const [timer, setTimer] = useState<PomodoroTimer>({
     id: '1',
@@ -115,8 +101,8 @@ export const usePomodoro = () => {
 
   const [currentTask, setCurrentTask] = useState<Task | undefined>();
   const [settings, setSettings] = useState<PomodoroSettings>(DEFAULT_SETTINGS);
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
-  const [taskLists, setTaskLists] = useState<TaskList[]>(MOCK_TASK_LISTS);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskLists, setTaskLists] = useState<TaskList[]>([]);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
   const [snoozeCount, setSnoozeCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -124,6 +110,82 @@ export const usePomodoro = () => {
   // Refs for timer functionality
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // API functions for persistence
+  const loadPomodoroData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/pomodoro${bookmarkId ? `?bookmarkId=${encodeURIComponent(bookmarkId)}` : ''}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Convert date strings back to Date objects with null checks
+        const tasksWithDates = (data.tasks || []).map((task: any) => ({
+          ...task,
+          createdAt: task.createdAt ? new Date(task.createdAt) : new Date(),
+          updatedAt: task.updatedAt ? new Date(task.updatedAt) : new Date(),
+          completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
+          dueDate: task.dueDate ? new Date(task.dueDate) : undefined
+        }));
+        
+        const sessionsWithDates = (data.sessions || []).map((session: any) => ({
+          ...session,
+          startTime: session.startTime ? new Date(session.startTime) : new Date(),
+          endTime: session.endTime ? new Date(session.endTime) : undefined
+        }));
+        
+        const taskListsWithDates = (data.taskLists || []).map((taskList: any) => ({
+          ...taskList,
+          createdAt: taskList.createdAt ? new Date(taskList.createdAt) : new Date(),
+          updatedAt: taskList.updatedAt ? new Date(taskList.updatedAt) : new Date()
+        }));
+        
+        setTasks(tasksWithDates);
+        setTaskLists(taskListsWithDates);
+        setSessions(sessionsWithDates);
+        setSettings(data.settings || DEFAULT_SETTINGS);
+      }
+    } catch (error) {
+      console.error('Error loading pomodoro data:', error);
+      // Fall back to mock data on error
+      setTasks(MOCK_TASKS);
+      setTaskLists(MOCK_TASK_LISTS);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const saveToAPI = useCallback(async (type: string, action: string, data: any) => {
+    try {
+      const response = await fetch(`/api/pomodoro${bookmarkId ? `?bookmarkId=${encodeURIComponent(bookmarkId)}` : ''}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ type, action, data: { ...data, bookmarkId } })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save to API');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`Error saving ${type}:`, error);
+      throw error;
+    }
+  }, []);
+
+  // Load data on mount
+  useEffect(() => {
+    loadPomodoroData();
+  }, [loadPomodoroData]);
 
   // Timer control functions
   const startTimer = useCallback(() => {
@@ -176,7 +238,7 @@ export const usePomodoro = () => {
       id: Date.now().toString(),
       taskId: currentTask?.id,
       taskTitle: currentTask?.title,
-      startTime: timer.startTime || new Date(),
+      startTime: (timer.startTime && timer.startTime instanceof Date) ? timer.startTime : new Date(),
       endTime: new Date(),
       duration: timer.duration,
       type: timer.type,
@@ -261,38 +323,89 @@ export const usePomodoro = () => {
   }, [timer.isActive, timer.isPaused, completeSession]);
 
   // Task management functions
-  const createTask = useCallback((taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const createTask = useCallback(async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     const newTask: Task = {
       ...taskData,
       id: Date.now().toString(),
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    setTasks(prev => [newTask, ...prev]);
-    return newTask;
-  }, []);
-
-  const updateTask = useCallback((taskId: string, updates: Partial<Task>) => {
-    setTasks(prev => prev.map(task => 
-      task.id === taskId 
-        ? { ...task, ...updates, updatedAt: new Date() }
-        : task
-    ));
-  }, []);
-
-  const deleteTask = useCallback((taskId: string) => {
-    setTasks(prev => prev.filter(task => task.id !== taskId));
-    if (currentTask?.id === taskId) {
-      setCurrentTask(undefined);
+    
+    try {
+      // Optimistically update UI
+      setTasks(prev => [newTask, ...prev]);
+      
+      // Save to API
+      await saveToAPI('task', 'create', newTask);
+      
+      return newTask;
+    } catch (error) {
+      // Revert optimistic update on error
+      setTasks(prev => prev.filter(task => task.id !== newTask.id));
+      throw error;
     }
-  }, [currentTask]);
+  }, [saveToAPI]);
+
+  const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
+    const updatedTask = { ...updates, id: taskId, updatedAt: new Date() };
+    
+    try {
+      // Optimistically update UI
+      setTasks(prev => prev.map(task => 
+        task.id === taskId 
+          ? { ...task, ...updates, updatedAt: new Date() }
+          : task
+      ));
+      
+      // Save to API
+      await saveToAPI('task', 'update', updatedTask);
+    } catch (error) {
+      // Revert optimistic update on error
+      loadPomodoroData();
+      throw error;
+    }
+  }, [saveToAPI, loadPomodoroData]);
+
+  const deleteTask = useCallback(async (taskId: string) => {
+    const taskToDelete = tasks.find(task => task.id === taskId);
+    
+    try {
+      // Optimistically update UI
+      setTasks(prev => prev.filter(task => task.id !== taskId));
+      if (currentTask?.id === taskId) {
+        setCurrentTask(undefined);
+      }
+      
+      // Save to API
+      await saveToAPI('task', 'delete', { id: taskId });
+    } catch (error) {
+      // Revert optimistic update on error
+      if (taskToDelete) {
+        setTasks(prev => [...prev, taskToDelete]);
+      }
+      loadPomodoroData();
+      throw error;
+    }
+  }, [currentTask, tasks, saveToAPI, loadPomodoroData]);
 
   const selectTask = useCallback((task: Task) => {
     setCurrentTask(task);
+    
+    // Update timer duration to match task duration if task has duration
+    if (task.duration && task.duration > 0) {
+      setTimer(prev => ({
+        ...prev,
+        duration: task.duration,
+        remainingTime: task.duration * 60, // Convert minutes to seconds
+        // Reset timer state when switching tasks
+        isActive: false,
+        isPaused: false
+      }));
+    }
   }, []);
 
   // Task list management
-  const createList = useCallback((listData: ListCreationData) => {
+  const createList = useCallback(async (listData: ListCreationData) => {
     const newList: TaskList = {
       id: Date.now().toString(),
       name: listData.name,
@@ -309,21 +422,56 @@ export const usePomodoro = () => {
       }, 0),
       completedTasks: 0
     };
+    
+    // Optimistic update
     setTaskLists(prev => [newList, ...prev]);
-    return newList;
-  }, [tasks]);
+    
+    try {
+      await saveToAPI('taskList', 'create', newList);
+      return newList;
+    } catch (error) {
+      console.error('Error creating task list:', error);
+      // Rollback on error
+      setTaskLists(prev => prev.filter(list => list.id !== newList.id));
+      await loadPomodoroData(); // Reload to get fresh state
+      throw error;
+    }
+  }, [tasks, saveToAPI, loadPomodoroData]);
 
-  const updateList = useCallback((listId: string, updates: Partial<TaskList>) => {
+  const updateList = useCallback(async (listId: string, updates: Partial<TaskList>) => {
+    const updatedData = { ...updates, updatedAt: new Date() };
+    
+    // Optimistic update
     setTaskLists(prev => prev.map(list => 
       list.id === listId 
-        ? { ...list, ...updates, updatedAt: new Date() }
+        ? { ...list, ...updatedData }
         : list
     ));
-  }, []);
+    
+    try {
+      await saveToAPI('taskList', 'update', { id: listId, ...updatedData });
+    } catch (error) {
+      console.error('Error updating task list:', error);
+      await loadPomodoroData(); // Reload to get fresh state
+      throw error;
+    }
+  }, [saveToAPI, loadPomodoroData]);
 
-  const deleteList = useCallback((listId: string) => {
+  const deleteList = useCallback(async (listId: string) => {
+    const originalLists = [...taskLists];
+    
+    // Optimistic update
     setTaskLists(prev => prev.filter(list => list.id !== listId));
-  }, []);
+    
+    try {
+      await saveToAPI('taskList', 'delete', { id: listId });
+    } catch (error) {
+      console.error('Error deleting task list:', error);
+      // Rollback on error
+      setTaskLists(originalLists);
+      throw error;
+    }
+  }, [saveToAPI, taskLists]);
 
   const setActiveList = useCallback((listId: string) => {
     setTaskLists(prev => prev.map(list => ({
@@ -343,8 +491,11 @@ export const usePomodoro = () => {
   }, [taskLists]);
 
   // Settings management
-  const updateSettings = useCallback((newSettings: Partial<PomodoroSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+  const updateSettings = useCallback(async (newSettings: Partial<PomodoroSettings>) => {
+    const updatedSettings = { ...settings, ...newSettings };
+    
+    // Update local state immediately (optimistic update)
+    setSettings(updatedSettings);
     
     // Update timer duration if not active
     if (!timer.isActive && newSettings.workDuration && timer.type === 'work') {
@@ -354,7 +505,17 @@ export const usePomodoro = () => {
         remainingTime: newSettings.workDuration! * 60
       }));
     }
-  }, [timer.isActive, timer.type]);
+    
+    // Persist to database
+    try {
+      await saveToAPI('settings', 'update', updatedSettings);
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      // Revert optimistic update on error
+      await loadPomodoroData();
+      throw error;
+    }
+  }, [settings, timer.isActive, timer.type, saveToAPI, loadPomodoroData]);
 
   // Analytics functions
   const getAnalytics = useCallback((): PomodoroAnalytics => {
@@ -373,7 +534,7 @@ export const usePomodoro = () => {
       weekEnd.setDate(weekStart.getDate() + 6);
       
       const weekSessions = completedSessions.filter(session => 
-        session.startTime >= weekStart && session.startTime <= weekEnd
+        session.startTime && session.startTime >= weekStart && session.startTime <= weekEnd
       );
       
       weeklyData.push({
@@ -393,7 +554,7 @@ export const usePomodoro = () => {
       const monthEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
       
       const monthSessions = completedSessions.filter(session => 
-        session.startTime >= monthStart && session.startTime <= monthEnd
+        session.startTime && session.startTime >= monthStart && session.startTime <= monthEnd
       );
       
       monthlyData.push({

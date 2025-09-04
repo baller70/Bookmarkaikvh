@@ -1,33 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, readFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join } from 'path';
 import { authenticateUser } from '@/lib/auth-utils';
+import { createClient } from '@supabase/supabase-js';
 
-// File-based storage for pomodoro data
-const POMODORO_FILE = join(process.cwd(), 'data', 'pomodoro.json');
-
-interface PomodoroData {
-  tasks: Task[];
-  sessions: PomodoroSession[];
-  settings: PomodoroSettings;
-  taskLists: TaskList[];
-}
+// Supabase client for server-side operations
+const getSupabase = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(supabaseUrl, supabaseServiceKey);
+};
 
 interface Task {
   id: string;
   title: string;
   description?: string;
-  priority: 'low' | 'medium' | 'high';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
   category: string;
   tags: string[];
   isCompleted: boolean;
   estimatedPomodoros: number;
   completedPomodoros: number;
+  duration?: number; // Duration in minutes for how long the task will take
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;
   dueDate?: Date;
+  notes?: string;
   userId: string;
 }
 
@@ -36,11 +33,13 @@ interface PomodoroSession {
   taskId?: string;
   taskTitle?: string;
   startTime: Date;
-  endTime: Date;
+  endTime?: Date;
   duration: number;
   type: 'work' | 'shortBreak' | 'longBreak';
   isCompleted: boolean;
   wasInterrupted: boolean;
+  interruptionReason?: string;
+  notes?: string;
   userId: string;
 }
 
@@ -71,48 +70,150 @@ interface TaskList {
   isActiveList: boolean;
   estimatedDuration: number;
   completedTasks: number;
-  userId: string;
 }
 
-// Ensure data directory exists
-async function ensureDataDirectory() {
-  const dataDir = join(process.cwd(), 'data');
-  if (!existsSync(dataDir)) {
-    await mkdir(dataDir, { recursive: true });
-  }
+interface PomodoroData {
+  tasks: Task[];
+  sessions: PomodoroSession[];
+  settings: PomodoroSettings;
+  taskLists: TaskList[];
 }
 
-// Load pomodoro data from file
-async function loadPomodoroData(): Promise<PomodoroData> {
+// Note: Tables should be created manually in Supabase dashboard or via migrations
+// This function is removed to avoid permission issues with RPC calls
+
+// Load pomodoro data from Supabase
+async function loadPomodoroData(userId: string, bookmarkId?: string): Promise<PomodoroData> {
+  const supabase = getSupabase();
+  
+  console.log('Loading pomodoro data for user:', userId);
+  
   try {
-    await ensureDataDirectory();
-    if (!existsSync(POMODORO_FILE)) {
-      const defaultData: PomodoroData = {
-        tasks: [],
-        sessions: [],
-        settings: {
-          workDuration: 25,
-          shortBreakDuration: 5,
-          longBreakDuration: 15,
-          longBreakInterval: 4,
-          autoStartBreaks: true,
-          autoStartWork: false,
-          soundEnabled: true,
-          notificationsEnabled: true,
-          tickingSound: false,
-          alarmSound: 'bell',
-          alarmVolume: 0.7,
-          userId: 'dev-user-fixed-id'
-        },
-        taskLists: []
-      };
-      await savePomodoroData(defaultData);
-      return defaultData;
+    // Load tasks from proper pomodoro_tasks table
+    let tasksQuery = supabase
+      .from('pomodoro_tasks')
+      .select('*')
+      .eq('user_id', userId);
+    if (bookmarkId) tasksQuery = tasksQuery.eq('bookmark_id', bookmarkId);
+    const { data: tasks, error: tasksError } = await tasksQuery
+      .order('created_at', { ascending: false });
+
+    if (tasksError) {
+      console.error('Error loading tasks:', tasksError);
+      console.error('Tasks error code:', tasksError.code);
     }
-    const data = await readFile(POMODORO_FILE, 'utf-8');
-    return JSON.parse(data) as PomodoroData;
+
+    // Load sessions
+    let sessionsQuery = supabase
+      .from('pomodoro_sessions')
+      .select('*')
+      .eq('user_id', userId);
+    if (bookmarkId) sessionsQuery = sessionsQuery.eq('bookmark_id', bookmarkId);
+    const { data: sessions, error: sessionsError } = await sessionsQuery
+      .order('start_time', { ascending: false });
+
+    if (sessionsError && sessionsError.code !== 'PGRST116') {
+      console.error('Error loading sessions:', sessionsError);
+    }
+
+    // Load settings
+    const { data: settings, error: settingsError } = await supabase
+      .from('pomodoro_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (settingsError && settingsError.code !== 'PGRST116') {
+      console.error('Error loading settings:', settingsError);
+    }
+
+    // Load task lists
+    const { data: taskLists, error: taskListsError } = await supabase
+      .from('pomodoro_task_lists')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (taskListsError && taskListsError.code !== 'PGRST116') {
+      console.error('Error loading task lists:', taskListsError);
+    }
+
+    return {
+      tasks: tasks?.map(task => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        category: task.category,
+        tags: task.tags || [],
+        isCompleted: task.is_completed,
+        estimatedPomodoros: task.estimated_pomodoros,
+        completedPomodoros: task.completed_pomodoros,
+        duration: task.duration,
+        createdAt: new Date(task.created_at),
+        updatedAt: new Date(task.updated_at),
+        completedAt: task.completed_at ? new Date(task.completed_at) : undefined,
+        dueDate: task.due_date ? new Date(task.due_date) : undefined,
+        notes: task.notes,
+        userId: task.user_id
+      })) || [],
+      sessions: sessions?.map(session => ({
+        id: session.id,
+        taskId: session.task_id,
+        taskTitle: session.task_title,
+        startTime: new Date(session.start_time),
+        endTime: session.end_time ? new Date(session.end_time) : undefined,
+        duration: session.duration,
+        type: session.type,
+        isCompleted: session.is_completed,
+        wasInterrupted: session.was_interrupted,
+        interruptionReason: session.interruption_reason,
+        notes: session.notes,
+        userId: session.user_id
+      })) || [],
+      settings: settings ? {
+        workDuration: settings.work_duration,
+        shortBreakDuration: settings.short_break_duration,
+        longBreakDuration: settings.long_break_duration,
+        longBreakInterval: settings.long_break_interval,
+        autoStartBreaks: settings.auto_start_breaks,
+        autoStartWork: settings.auto_start_work,
+        soundEnabled: settings.sound_enabled,
+        notificationsEnabled: settings.notifications_enabled,
+        tickingSound: settings.ticking_sound,
+        alarmSound: settings.alarm_sound,
+        alarmVolume: settings.alarm_volume,
+        userId: settings.user_id
+      } : {
+        workDuration: 25,
+        shortBreakDuration: 5,
+        longBreakDuration: 15,
+        longBreakInterval: 4,
+        autoStartBreaks: true,
+        autoStartWork: false,
+        soundEnabled: true,
+        notificationsEnabled: true,
+        tickingSound: false,
+        alarmSound: 'bell',
+        alarmVolume: 0.7,
+        userId
+      },
+      taskLists: taskLists?.map(list => ({
+        id: list.id,
+        name: list.name,
+        description: list.description,
+        color: list.color,
+        taskIds: list.task_ids || [],
+        createdAt: new Date(list.created_at),
+        updatedAt: new Date(list.updated_at),
+        isArchived: list.is_archived,
+        isActiveList: list.is_active_list,
+        estimatedDuration: list.estimated_duration,
+        completedTasks: list.completed_tasks
+      })) || []
+    };
   } catch (error) {
-    console.error('❌ Error loading pomodoro data:', error);
+    console.error('Error loading pomodoro data from Supabase:', error);
     return {
       tasks: [],
       sessions: [],
@@ -128,26 +229,17 @@ async function loadPomodoroData(): Promise<PomodoroData> {
         tickingSound: false,
         alarmSound: 'bell',
         alarmVolume: 0.7,
-        userId: 'dev-user-fixed-id'
+        userId
       },
       taskLists: []
     };
   }
 }
 
-// Save pomodoro data to file
-async function savePomodoroData(data: PomodoroData): Promise<void> {
-  try {
-    await ensureDataDirectory();
-    await writeFile(POMODORO_FILE, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error('❌ Error saving pomodoro data:', error);
-    throw error;
-  }
-}
-
 // GET /api/pomodoro - Get all pomodoro data for user
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const bookmarkId = searchParams.get('bookmarkId') || undefined;
   try {
     const authResult = await authenticateUser(request);
     if (!authResult.success) {
@@ -156,49 +248,18 @@ export async function GET(request: NextRequest) {
         { status: authResult.status || 401 }
       );
     }
-    
+
     const userId = authResult.userId!;
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type'); // tasks, sessions, settings, lists
-
-    const data = await loadPomodoroData();
-
-    // Filter data by user
-    const userData = {
-      tasks: data.tasks.filter(task => task.userId === userId),
-      sessions: data.sessions.filter(session => session.userId === userId),
-      settings: data.settings.userId === userId ? data.settings : {
-        workDuration: 25,
-        shortBreakDuration: 5,
-        longBreakDuration: 15,
-        longBreakInterval: 4,
-        autoStartBreaks: true,
-        autoStartWork: false,
-        soundEnabled: true,
-        notificationsEnabled: true,
-        tickingSound: false,
-        alarmSound: 'bell',
-        alarmVolume: 0.7,
-        userId
-      },
-      taskLists: data.taskLists.filter(list => list.userId === userId)
-    };
-
-    // Return specific type if requested
-    if (type) {
-      return NextResponse.json({
-        success: true,
-        data: userData[type as keyof typeof userData] || null
-      });
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: userData
+    
+    const data = await loadPomodoroData(userId, bookmarkId);
+    
+    return NextResponse.json(data, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      }
     });
-
   } catch (error) {
-    console.error('❌ Error fetching pomodoro data:', error);
+    console.error('Error in GET /api/pomodoro:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -208,6 +269,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/pomodoro - Create or update pomodoro data
 export async function POST(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const bookmarkId = searchParams.get('bookmarkId') || null;
+  
+  console.log('🔍 Pomodoro POST - bookmarkId:', bookmarkId);
+  
   try {
     const authResult = await authenticateUser(request);
     if (!authResult.success) {
@@ -216,104 +282,219 @@ export async function POST(request: NextRequest) {
         { status: authResult.status || 401 }
       );
     }
-    
+
     const userId = authResult.userId!;
     const body = await request.json();
     const { type, action, data: itemData } = body;
 
-    const data = await loadPomodoroData();
+    const supabase = getSupabase();
 
+    console.log('POST /api/pomodoro - Request:', { type, action, userId, itemData });
+    
     switch (type) {
       case 'task':
         if (action === 'create') {
-          const newTask: Task = {
-            ...itemData,
-            id: Date.now().toString(),
-            userId,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          };
-          data.tasks.push(newTask);
+          const { error } = await supabase
+            .from('pomodoro_tasks')
+            .insert({
+              id: itemData.id,
+              user_id: userId,
+              title: itemData.title,
+              description: itemData.description,
+              priority: itemData.priority,
+              category: itemData.category,
+              tags: itemData.tags,
+              is_completed: itemData.isCompleted,
+              estimated_pomodoros: itemData.estimatedPomodoros,
+              completed_pomodoros: itemData.completedPomodoros,
+              duration: itemData.duration,
+              due_date: itemData.dueDate,
+              notes: itemData.notes,
+              bookmark_id: bookmarkId
+            });
+          
+          if (error) {
+            console.error('Error creating task:', error);
+            console.error('Full error details:', JSON.stringify(error, null, 2));
+            
+            // If table doesn't exist, provide a helpful error message
+            if (error.code === '42P01') {
+              return NextResponse.json({ 
+                error: 'Pomodoro tables not found. Please contact support to set up the database tables.',
+                code: 'TABLES_NOT_FOUND'
+              }, { status: 500 });
+            }
+            
+            return NextResponse.json({ 
+              error: 'Failed to create task', 
+              details: error.message,
+              code: error.code 
+            }, { status: 500 });
+          }
+          
+          return NextResponse.json({ 
+            success: true, 
+            message: 'Task created successfully' 
+          });
         } else if (action === 'update') {
-          const taskIndex = data.tasks.findIndex(task => task.id === itemData.id && task.userId === userId);
-          if (taskIndex !== -1) {
-            data.tasks[taskIndex] = {
-              ...data.tasks[taskIndex],
-              ...itemData,
-              updatedAt: new Date()
-            };
+          const { error } = await supabase
+            .from('pomodoro_tasks')
+            .update({
+              title: itemData.title,
+              description: itemData.description,
+              priority: itemData.priority,
+              category: itemData.category,
+              tags: itemData.tags,
+              is_completed: itemData.isCompleted,
+              estimated_pomodoros: itemData.estimatedPomodoros,
+              completed_pomodoros: itemData.completedPomodoros,
+              duration: itemData.duration,
+              completed_at: itemData.completedAt,
+              due_date: itemData.dueDate,
+              notes: itemData.notes,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', itemData.id)
+            .eq('user_id', userId);
+          
+          if (error) {
+            console.error('Error updating task:', error);
+            return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
           }
         } else if (action === 'delete') {
-          data.tasks = data.tasks.filter(task => !(task.id === itemData.id && task.userId === userId));
+          const { error } = await supabase
+            .from('pomodoro_tasks')
+            .delete()
+            .eq('id', itemData.id)
+            .eq('user_id', userId);
+          
+          if (error) {
+            console.error('Error deleting task:', error);
+            return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
+          }
         }
         break;
 
       case 'session':
         if (action === 'create') {
-          const newSession: PomodoroSession = {
-            ...itemData,
-            id: Date.now().toString(),
-            userId,
-            startTime: new Date(itemData.startTime),
-            endTime: new Date(itemData.endTime)
-          };
-          data.sessions.push(newSession);
+          const { error } = await supabase
+            .from('pomodoro_sessions')
+            .insert({
+              id: itemData.id,
+              user_id: userId,
+              task_id: itemData.taskId,
+              task_title: itemData.taskTitle,
+              start_time: itemData.startTime,
+              end_time: itemData.endTime,
+              duration: itemData.duration,
+              type: itemData.type,
+              is_completed: itemData.isCompleted,
+              was_interrupted: itemData.wasInterrupted,
+              interruption_reason: itemData.interruptionReason,
+              notes: itemData.notes,
+              bookmark_id: bookmarkId
+            });
+          
+          if (error) {
+            console.error('Error creating session:', error);
+            return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
+          }
         }
         break;
 
       case 'settings':
         if (action === 'update') {
-          data.settings = {
-            ...data.settings,
-            ...itemData,
-            userId
-          };
+          const { error } = await supabase
+            .from('pomodoro_settings')
+            .upsert({
+              user_id: userId,
+              work_duration: itemData.workDuration,
+              short_break_duration: itemData.shortBreakDuration,
+              long_break_duration: itemData.longBreakDuration,
+              long_break_interval: itemData.longBreakInterval,
+              auto_start_breaks: itemData.autoStartBreaks,
+              auto_start_work: itemData.autoStartWork,
+              sound_enabled: itemData.soundEnabled,
+              notifications_enabled: itemData.notificationsEnabled,
+              ticking_sound: itemData.tickingSound,
+              alarm_sound: itemData.alarmSound,
+              alarm_volume: itemData.alarmVolume,
+              updated_at: new Date().toISOString()
+            });
+          
+          if (error) {
+            console.error('Error updating settings:', error);
+            return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
+          }
         }
         break;
 
       case 'taskList':
         if (action === 'create') {
-          const newTaskList: TaskList = {
-            ...itemData,
-            id: Date.now().toString(),
-            userId,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          };
-          data.taskLists.push(newTaskList);
+          const { error } = await supabase
+            .from('pomodoro_task_lists')
+            .insert({
+              id: itemData.id,
+              user_id: userId,
+              name: itemData.name,
+              description: itemData.description,
+              color: itemData.color,
+              task_ids: itemData.taskIds,
+              is_archived: itemData.isArchived,
+              is_active_list: itemData.isActiveList,
+              estimated_duration: itemData.estimatedDuration,
+              completed_tasks: itemData.completedTasks
+            });
+          
+          if (error) {
+            console.error('Error creating task list:', error);
+            return NextResponse.json({ error: 'Failed to create task list' }, { status: 500 });
+          }
         } else if (action === 'update') {
-          const listIndex = data.taskLists.findIndex(list => list.id === itemData.id && list.userId === userId);
-          if (listIndex !== -1) {
-            data.taskLists[listIndex] = {
-              ...data.taskLists[listIndex],
-              ...itemData,
-              updatedAt: new Date()
-            };
+          const { error } = await supabase
+            .from('pomodoro_task_lists')
+            .update({
+              name: itemData.name,
+              description: itemData.description,
+              color: itemData.color,
+              task_ids: itemData.taskIds,
+              is_archived: itemData.isArchived,
+              is_active_list: itemData.isActiveList,
+              estimated_duration: itemData.estimatedDuration,
+              completed_tasks: itemData.completedTasks,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', itemData.id)
+            .eq('user_id', userId);
+          
+          if (error) {
+            console.error('Error updating task list:', error);
+            return NextResponse.json({ error: 'Failed to update task list' }, { status: 500 });
           }
         } else if (action === 'delete') {
-          data.taskLists = data.taskLists.filter(list => !(list.id === itemData.id && list.userId === userId));
+          const { error } = await supabase
+            .from('pomodoro_task_lists')
+            .delete()
+            .eq('id', itemData.id)
+            .eq('user_id', userId);
+          
+          if (error) {
+            console.error('Error deleting task list:', error);
+            return NextResponse.json({ error: 'Failed to delete task list' }, { status: 500 });
+          }
         }
         break;
 
       default:
-        return NextResponse.json(
-          { error: 'Invalid type specified' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
     }
 
-    await savePomodoroData(data);
-
-    return NextResponse.json({
-      success: true,
-      message: `${type} ${action}d successfully`
-    });
-
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('❌ Error updating pomodoro data:', error);
+    console.error('Error in POST /api/pomodoro:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
   }
-}                
+}

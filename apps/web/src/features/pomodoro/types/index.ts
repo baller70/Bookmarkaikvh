@@ -22,6 +22,7 @@ export interface Task {
   isCompleted: boolean;
   estimatedPomodoros: number;
   completedPomodoros: number;
+  duration?: number; // Duration in minutes for how long the task will take
   createdAt: Date;
   updatedAt: Date;
   dueDate?: Date;
@@ -147,6 +148,23 @@ export interface ListCreationData {
   description?: string;
   color: string;
   selectedTaskIds: string[];
+}
+
+// Scheduling Queue Types
+export interface ScheduledItem {
+  id: string;
+  type: 'task' | 'list';
+  taskId?: string; // For individual tasks
+  listId?: string; // For task lists
+  order: number;
+  estimatedDuration: number; // in minutes
+  createdAt: Date;
+}
+
+export interface ScheduleQueue {
+  items: ScheduledItem[];
+  currentIndex: number;
+  isActive: boolean;
 }
 
 export interface TaskWithDetails extends Task {

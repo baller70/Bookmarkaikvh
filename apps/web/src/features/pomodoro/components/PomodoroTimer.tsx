@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,9 +15,16 @@ import {
   Zap,
   Clock,
   Target,
-  CheckCircle2
+  CheckCircle2,
+  Calendar,
+  List,
+  Plus,
+  GripVertical,
+  Trash2,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
-import { Task } from '../types';
+import { Task, TaskList, ScheduledItem, ScheduleQueue } from '../types';
 
 interface PomodoroTimerProps {
   timer: any;
@@ -34,7 +41,9 @@ interface PomodoroTimerProps {
   maxSnoozeCount: number;
   snoozeOptions: any[];
   tasks: Task[];
+  taskLists: TaskList[];
   selectTask: (task: Task) => void;
+  getTasksForList: (listId: string) => Task[];
 }
 
 export default function PomodoroTimer({
@@ -52,7 +61,9 @@ export default function PomodoroTimer({
   maxSnoozeCount,
   snoozeOptions,
   tasks,
-  selectTask
+  taskLists,
+  selectTask,
+  getTasksForList
 }: PomodoroTimerProps) {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -86,6 +97,108 @@ export default function PomodoroTimer({
 
   const activeTasks = tasks.filter(task => !task.isCompleted);
 
+  // Scheduling Queue State
+  const [scheduleQueue, setScheduleQueue] = useState<ScheduledItem[]>([]);
+  const [showScheduler, setShowScheduler] = useState(false);
+
+  // Scheduling Functions
+  const addTaskToSchedule = (task: Task) => {
+    const newItem: ScheduledItem = {
+      id: `schedule-${Date.now()}`,
+      type: 'task',
+      taskId: task.id,
+      order: scheduleQueue.length,
+      estimatedDuration: task.duration || task.estimatedPomodoros * 25,
+      createdAt: new Date()
+    };
+    setScheduleQueue(prev => [...prev, newItem]);
+  };
+
+  const addListToSchedule = (list: TaskList) => {
+    const listTasks = getTasksForList(list.id);
+    const totalDuration = listTasks.reduce((sum, task) => 
+      sum + (task.duration || task.estimatedPomodoros * 25), 0
+    );
+    
+    const newItem: ScheduledItem = {
+      id: `schedule-${Date.now()}`,
+      type: 'list',
+      listId: list.id,
+      order: scheduleQueue.length,
+      estimatedDuration: totalDuration,
+      createdAt: new Date()
+    };
+    setScheduleQueue(prev => [...prev, newItem]);
+  };
+
+  const removeFromSchedule = (itemId: string) => {
+    setScheduleQueue(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const moveScheduleItem = (itemId: string, direction: 'up' | 'down') => {
+    setScheduleQueue(prev => {
+      const items = [...prev];
+      const index = items.findIndex(item => item.id === itemId);
+      
+      if (index === -1) return prev;
+      
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      
+      if (newIndex < 0 || newIndex >= items.length) return prev;
+      
+      // Swap items
+      [items[index], items[newIndex]] = [items[newIndex], items[index]];
+      
+      // Update order values
+      items.forEach((item, idx) => {
+        item.order = idx;
+      });
+      
+      return items;
+    });
+  };
+
+  const startScheduledSession = () => {
+    if (scheduleQueue.length === 0) return;
+    
+    const firstItem = scheduleQueue[0];
+    
+    if (firstItem.type === 'task' && firstItem.taskId) {
+      const task = tasks.find(t => t.id === firstItem.taskId);
+      if (task) {
+        selectTask(task);
+        startTimer();
+      }
+    } else if (firstItem.type === 'list' && firstItem.listId) {
+      const listTasks = getTasksForList(firstItem.listId);
+      const firstActiveTask = listTasks.find(t => !t.isCompleted);
+      if (firstActiveTask) {
+        selectTask(firstActiveTask);
+        startTimer();
+      }
+    }
+  };
+
+  const getScheduleItemDetails = (item: ScheduledItem) => {
+    if (item.type === 'task' && item.taskId) {
+      const task = tasks.find(t => t.id === item.taskId);
+      return {
+        title: task?.title || 'Unknown Task',
+        subtitle: task?.category || '',
+        color: 'bg-blue-100 text-blue-800'
+      };
+    } else if (item.type === 'list' && item.listId) {
+      const list = taskLists.find(l => l.id === item.listId);
+      const listTasks = getTasksForList(item.listId);
+      return {
+        title: list?.name || 'Unknown List',
+        subtitle: `${listTasks.length} tasks`,
+        color: 'bg-purple-100 text-purple-800'
+      };
+    }
+    return { title: 'Unknown Item', subtitle: '', color: 'bg-gray-100 text-gray-800' };
+  };
+
   return (
     <div className="space-y-6">
       {/* Main Timer Display */}
@@ -109,6 +222,32 @@ export default function PomodoroTimer({
                  timer.type === 'shortBreak' ? 'SHORT BREAK' : 'LONG BREAK'}
               </Badge>
             </div>
+
+            {/* Current Task Title - Only show during work sessions */}
+            {timer.type === 'work' && currentTask && (
+              <div className="text-center space-y-2">
+                <div className="text-sm text-gray-500 uppercase tracking-wide">CURRENT TASK</div>
+                <div className="text-xl font-semibold text-gray-800 max-w-md mx-auto">
+                  {currentTask.title}
+                </div>
+                {currentTask.description && (
+                  <div className="text-sm text-gray-600 max-w-md mx-auto">
+                    {currentTask.description}
+                  </div>
+                )}
+                {currentTask.duration && (
+                  <div className="text-sm text-blue-600 flex items-center justify-center space-x-1">
+                    <Clock className="w-4 h-4" />
+                    <span>
+                      {currentTask.duration < 60 
+                        ? `${currentTask.duration}m` 
+                        : `${Math.floor(currentTask.duration / 60)}h ${currentTask.duration % 60 > 0 ? `${currentTask.duration % 60}m` : ''}`
+                      }
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Time Display */}
             <div className={`text-8xl font-bold ${getTimerColor()}`}>
@@ -284,6 +423,173 @@ export default function PomodoroTimer({
                   Go to Tasks tab to create your first task
                 </p>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Scheduling Queue */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center space-x-2">
+              <Calendar className="w-5 h-5" />
+              <span>SCHEDULE QUEUE</span>
+              {scheduleQueue.length > 0 && (
+                <Badge variant="outline">{scheduleQueue.length}</Badge>
+              )}
+            </CardTitle>
+            <Button
+              onClick={() => setShowScheduler(!showScheduler)}
+              variant="outline"
+              size="sm"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {showScheduler ? 'HIDE' : 'ADD ITEMS'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Add Items Section */}
+          {showScheduler && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="space-y-4">
+                {/* Add Tasks */}
+                <div>
+                  <h4 className="font-medium text-sm text-gray-700 mb-2">Add Tasks:</h4>
+                  <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
+                    {activeTasks.map((task) => (
+                      <Button
+                        key={task.id}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => addTaskToSchedule(task)}
+                        className="justify-start text-left"
+                        disabled={scheduleQueue.some(item => item.taskId === task.id)}
+                      >
+                        <Target className="w-4 h-4 mr-2" />
+                        <div className="flex-1">
+                          <div className="font-medium">{task.title}</div>
+                          <div className="text-xs text-gray-500">
+                            {task.duration ? `${task.duration}m` : `${task.estimatedPomodoros * 25}m`}
+                          </div>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Add Lists */}
+                <div>
+                  <h4 className="font-medium text-sm text-gray-700 mb-2">Add Lists:</h4>
+                  <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
+                    {taskLists.map((list) => {
+                      const listTasks = getTasksForList(list.id);
+                      const activeTasks = listTasks.filter(t => !t.isCompleted);
+                      return (
+                        <Button
+                          key={list.id}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addListToSchedule(list)}
+                          className="justify-start text-left"
+                          disabled={scheduleQueue.some(item => item.listId === list.id) || activeTasks.length === 0}
+                        >
+                          <List className="w-4 h-4 mr-2" />
+                          <div className="flex-1">
+                            <div className="font-medium">{list.name}</div>
+                            <div className="text-xs text-gray-500">
+                              {activeTasks.length} active tasks
+                            </div>
+                          </div>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Scheduled Items */}
+          {scheduleQueue.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">
+                  Total estimated time: {Math.round(scheduleQueue.reduce((sum, item) => sum + item.estimatedDuration, 0))} minutes
+                </p>
+                <Button
+                  onClick={startScheduledSession}
+                  className="bg-green-500 hover:bg-green-600"
+                  size="sm"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  START QUEUE
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                {scheduleQueue.map((item, index) => {
+                  const details = getScheduleItemDetails(item);
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center space-x-3 p-3 bg-white border rounded-lg"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline" className="text-xs">
+                          #{index + 1}
+                        </Badge>
+                        <Badge className={details.color}>
+                          {item.type.toUpperCase()}
+                        </Badge>
+                      </div>
+
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{details.title}</div>
+                        <div className="text-xs text-gray-500">
+                          {details.subtitle} • {item.estimatedDuration}m
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => moveScheduleItem(item.id, 'up')}
+                          disabled={index === 0}
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => moveScheduleItem(item.id, 'down')}
+                          disabled={index === scheduleQueue.length - 1}
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFromSchedule(item.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 mb-2">No items scheduled</p>
+              <p className="text-sm text-gray-500">
+                Add tasks or lists to create a focused work session
+              </p>
             </div>
           )}
         </CardContent>

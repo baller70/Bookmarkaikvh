@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import React from 'react'
+import { sendEmail } from '@/lib/email'
 
 // POST /api/notifications/test-simple - Send test notification without authentication
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { channel } = body
+    const { channel, to } = body
 
     if (!channel || !['email', 'push', 'inApp'].includes(channel)) {
       return NextResponse.json({ error: 'Invalid channel' }, { status: 400 })
@@ -22,12 +24,24 @@ export async function POST(request: NextRequest) {
         notificationData.title = 'Test Email Notification'
         notificationData.message = 'This is a test email notification from your bookmark manager. If you received this, your email notifications are working correctly!'
         notificationData.metadata = {
-          recipient: 'test@example.com',
+          recipient: to || 'test@example.com',
           template: 'test_notification'
         }
-        
-        // Simulate email sending delay
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        // If RESEND_API_KEY is configured, send a real email via Resend
+        if (process.env.RESEND_API_KEY && (to || process.env.TEST_EMAIL)) {
+          const recipient = (to || process.env.TEST_EMAIL) as string
+          await sendEmail({
+            to: recipient,
+            subject: notificationData.title,
+            react: React.createElement('div', null,
+              React.createElement('h2', null, '📬 BookmarkHub Notification Test'),
+              React.createElement('p', null, notificationData.message)
+            )
+          })
+        } else {
+          // Fallback: simulate delay so UI feedback feels consistent
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
         break
 
       case 'push':

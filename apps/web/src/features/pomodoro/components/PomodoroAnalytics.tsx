@@ -45,14 +45,18 @@ export default function PomodoroAnalytics({
   const getAverageSessionsPerDay = () => {
     if (sessions.length === 0) return 0;
     
-    const dates = sessions.map(s => s.startTime.toDateString());
+    const dates = sessions
+      .filter(s => s.startTime && s.startTime instanceof Date)
+      .map(s => s.startTime.toDateString());
     const uniqueDates = [...new Set(dates)];
     return Math.round(sessions.length / Math.max(uniqueDates.length, 1));
   };
 
   const getTodayStats = () => {
     const today = new Date().toDateString();
-    const todaySessions = sessions.filter(s => s.startTime.toDateString() === today);
+    const todaySessions = sessions.filter(s => 
+      s.startTime && s.startTime instanceof Date && s.startTime.toDateString() === today
+    );
     const todayFocusTime = todaySessions
       .filter(s => s.type === 'work' && s.isCompleted)
       .reduce((total, s) => total + s.duration, 0);
@@ -74,7 +78,7 @@ export default function PomodoroAnalytics({
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -84,20 +88,6 @@ export default function PomodoroAnalytics({
               </div>
               <div className="bg-blue-500 p-3 rounded-full">
                 <Clock className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600">FOCUS TIME</p>
-                <p className="text-3xl font-bold text-green-900">{formatTime(analytics.totalFocusTime)}</p>
-              </div>
-              <div className="bg-green-500 p-3 rounded-full">
-                <Zap className="w-6 h-6 text-white" />
               </div>
             </div>
           </CardContent>
@@ -275,7 +265,10 @@ export default function PomodoroAnalytics({
                   <div className="text-right">
                     <p className="text-sm font-medium">{formatTime(session.duration)}</p>
                     <p className="text-xs text-gray-500">
-                      {session.startTime.toLocaleDateString()}
+                      {session.startTime && session.startTime instanceof Date 
+                        ? session.startTime.toLocaleDateString()
+                        : 'N/A'
+                      }
                     </p>
                   </div>
                   

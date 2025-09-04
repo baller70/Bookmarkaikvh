@@ -3,27 +3,27 @@ import { createClient } from '@supabase/supabase-js';
 import { writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
+import { authenticateUser } from '@/lib/auth-utils'
 
 // POST /api/user-data/upload - Upload file to Supabase storage and save metadata
 export async function POST(request: NextRequest) {
   try {
-    // Lazy initialization to avoid build-time environment variable issues
-let supabaseClient: any = null
-
-const getSupabaseClient = () => {
-  if (!supabaseClient && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    supabaseClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    )
-  }
-  return supabaseClient
-};
-    const { data: { user }, error: authError } = await getSupabaseClient().auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized', success: false }, { status: 401 });
+    // Use authentication utility
+    const authResult = await authenticateUser(request);
+    if (!authResult.success) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status || 401 }
+      );
     }
+
+    const userId = authResult.userId!;
+
+    // Create Supabase client with service role for database operations
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -43,7 +43,7 @@ const getSupabaseClient = () => {
 
     // If file is larger than Supabase threshold, save locally under public/user-media
     if (file.size > supabaseMaxSize) {
-      const publicDir = join(process.cwd(), 'public', 'user-media', user.id, type)
+      const publicDir = join(process.cwd(), 'public', 'user-media', userId, type)
       if (!existsSync(publicDir)) {
         await mkdir(publicDir, { recursive: true })
       }
@@ -51,10 +51,10 @@ const getSupabaseClient = () => {
       const arrayBuffer = await file.arrayBuffer()
       await writeFile(localPath, Buffer.from(arrayBuffer))
 
-      const publicUrl = `/user-media/${user.id}/${type}/${uniqueFileName}`
+      const publicUrl = `/user-media/${userId}/${type}/${uniqueFileName}`
 
       const mediaFileData = {
-        user_id: user.id,
+        user_id: userId,
         name: file.name,
         type: type as 'image' | 'video' | 'document' | 'logo',
         url: publicUrl,
@@ -86,14 +86,14 @@ const getSupabaseClient = () => {
       }, { status: 201 });
     }
 
-    const filePath = `${user.id}/${type}/${uniqueFileName}`;
+    const filePath = `${userId}/${type}/${uniqueFileName}`;
 
     // Convert file to buffer
     const fileBuffer = await file.arrayBuffer();
     const buffer = new Uint8Array(fileBuffer);
 
     // Upload to Supabase storage
-    const { data: uploadData, error: uploadError } = await getSupabaseClient().storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from('user-media')
       .upload(filePath, buffer, {
         contentType: file.type,
@@ -106,13 +106,13 @@ const getSupabaseClient = () => {
     }
 
     // Get public URL
-    const { data: { publicUrl } } = getSupabaseClient().storage
+    const { data: { publicUrl } } = supabase.storage
       .from('user-media')
       .getPublicUrl(filePath);
 
     // Save metadata to database
     const mediaFileData = {
-      user_id: user.id,
+      user_id: userId,
       name: file.name,
       type: type as 'image' | 'video' | 'document' | 'logo',
       url: publicUrl,
@@ -137,7 +137,7 @@ const getSupabaseClient = () => {
       console.error('Error saving media file metadata:', dbError);
       
       // Clean up uploaded file if database save fails
-      await getSupabaseClient().storage
+      await supabase.storage
         .from('user-media')
         .remove([filePath]);
         
@@ -189,7 +189,7 @@ const getSupabaseClient = () => {
     // Generate signed URL for direct upload (useful for large files)
     const fileExtension = fileName.split('.').pop();
     const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExtension}`;
-    const filePath = `${user.id}/${type}/${uniqueFileName}`;
+    const filePath = `${userId}/${type}/${uniqueFileName}`;
 
     const { data: signedUrl, error: signedUrlError } = await getSupabaseClient().storage
       .from('user-media')

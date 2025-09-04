@@ -556,11 +556,10 @@ export function RichTextEditor({ content, onChange, onMediaEmbed, mediaFiles = [
       {/* Slash Command Menu */}
       {showSlashMenu && (
         <Card 
-          className="fixed z-50 w-80 max-h-80 overflow-y-auto shadow-lg"
+          className="absolute z-50 w-80 max-h-80 overflow-y-auto shadow-lg"
           style={{ 
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)'
+            left: `${slashMenuPosition.x}px`, 
+            top: `${slashMenuPosition.y}px`
           }}
         >
           <div className="p-2">
@@ -571,26 +570,32 @@ export function RichTextEditor({ content, onChange, onMediaEmbed, mediaFiles = [
               className="mb-2"
               autoFocus
             />
-            <div className="space-y-1">
-              {filteredCommands.map((command) => (
-                <Button
-                  key={command.id}
-                  variant="ghost"
-                  className="w-full justify-start h-auto p-2"
-                  onClick={command.action}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center text-xs font-mono">
-                      {command.icon}
+            {filteredCommands.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                No commands found
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {filteredCommands.map((command) => (
+                  <Button
+                    key={command.id}
+                    variant="ghost"
+                    className="w-full justify-start h-auto p-2"
+                    onClick={command.action}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center text-xs font-mono">
+                        {command.icon}
+                      </div>
+                      <div className="text-left">
+                        <div className="font-medium">{command.label}</div>
+                        <div className="text-xs text-gray-500">{command.description}</div>
+                      </div>
                     </div>
-                    <div className="text-left">
-                      <div className="font-medium">{command.label}</div>
-                      <div className="text-xs text-gray-500">{command.description}</div>
-                    </div>
-                  </div>
-                </Button>
-              ))}
-            </div>
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
         </Card>
       )}

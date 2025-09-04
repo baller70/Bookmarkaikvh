@@ -269,9 +269,11 @@ const mockPlaybookService = {
     // Apply sorting
     if (filters.sort_by === 'created_at') {
       filtered.sort((a, b) => {
-        const dateA = new Date(a.createdAt).getTime()
-        const dateB = new Date(b.createdAt).getTime()
-        return filters.sort_order === 'desc' ? dateB - dateA : dateA - dateB
+        const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0);
+        const dateB = b.createdAt ? new Date(b.createdAt) : new Date(0);
+        const timeA = isNaN(dateA.getTime()) ? 0 : dateA.getTime();
+        const timeB = isNaN(dateB.getTime()) ? 0 : dateB.getTime();
+        return filters.sort_order === 'desc' ? timeB - timeA : timeA - timeB;
       })
     } else if (filters.sort_by === 'plays') {
       filtered.sort((a, b) => {

@@ -20,6 +20,8 @@ export async function authenticateUser(request: NextRequest): Promise<AuthResult
     const isDevelopment = process.env.NODE_ENV === 'development'
     const enableFallback = (process.env.ENABLE_FILE_STORAGE_FALLBACK || '').trim() === 'true'
     
+
+    
     // Allow bypass in development, when explicitly enabled, or when using fallback storage
     if (bypassAuth || isDevelopment || enableFallback) {
       // Use a valid UUID format for Supabase compatibility

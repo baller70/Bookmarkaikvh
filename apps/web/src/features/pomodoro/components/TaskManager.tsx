@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 import { 
   Plus, 
   Play, 
@@ -15,7 +16,9 @@ import {
   Target,
   Calendar,
   Filter,
-  Search
+  Search,
+  Trash2,
+  Edit3
 } from 'lucide-react';
 import { Task } from '../types';
 
@@ -43,6 +46,7 @@ export default function TaskManager({
   startTimer
 }: TaskManagerProps) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('active');
@@ -52,12 +56,30 @@ export default function TaskManager({
     priority: 'low' | 'medium' | 'high' | 'urgent';
     category: string;
     estimatedPomodoros: number;
+    duration: number; // Duration in minutes
   }>({
     title: '',
     description: '',
     priority: 'medium',
     category: 'General',
-    estimatedPomodoros: 1
+    estimatedPomodoros: 1,
+    duration: 30 // Default 30 minutes
+  });
+
+  const [editTask, setEditTask] = useState<{
+    title: string;
+    description: string;
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+    category: string;
+    estimatedPomodoros: number;
+    duration: number;
+  }>({
+    title: '',
+    description: '',
+    priority: 'medium',
+    category: 'General',
+    estimatedPomodoros: 1,
+    duration: 30
   });
 
   const filteredTasks = tasks.filter(task => {
@@ -71,25 +93,99 @@ export default function TaskManager({
     return matchesSearch && matchesPriority && matchesStatus;
   });
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!newTask.title.trim()) return;
 
-    addTask({
-      ...newTask,
-      tags: [],
-      isCompleted: false,
-      completedPomodoros: 0,
-      dueDate: undefined
-    });
+    try {
+      const createdTask = await addTask({
+        ...newTask,
+        tags: [],
+        isCompleted: false,
+        completedPomodoros: 0,
+        dueDate: undefined
+      });
 
-    setNewTask({
+      // Format duration for toast message
+      const durationText = newTask.duration < 60 
+        ? `${newTask.duration}m` 
+        : `${Math.floor(newTask.duration / 60)}h ${newTask.duration % 60 > 0 ? `${newTask.duration % 60}m` : ''}`;
+
+      toast.success(`Task created successfully! (${durationText}) Priority: ${newTask.priority}`);
+
+      setNewTask({
+        title: '',
+        description: '',
+        priority: 'medium',
+        category: 'General',
+        estimatedPomodoros: 1,
+        duration: 30
+      });
+      setShowAddForm(false);
+    } catch (error) {
+      console.error('Error creating task:', error);
+      toast.error('Failed to create task. Please try again.');
+    }
+  };
+
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setEditTask({
+      title: task.title,
+      description: task.description || '',
+      priority: task.priority,
+      category: task.category,
+      estimatedPomodoros: task.estimatedPomodoros,
+      duration: task.duration || 30
+    });
+    setShowAddForm(false); // Close add form if open
+  };
+
+  const handleUpdateTask = async () => {
+    if (!editingTask || !editTask.title.trim()) return;
+
+    try {
+      await updateTask(editingTask.id, {
+        title: editTask.title,
+        description: editTask.description,
+        priority: editTask.priority,
+        category: editTask.category,
+        estimatedPomodoros: editTask.estimatedPomodoros,
+        duration: editTask.duration,
+        updatedAt: new Date()
+      });
+
+      // Format duration for toast message
+      const durationText = editTask.duration < 60 
+        ? `${editTask.duration}m` 
+        : `${Math.floor(editTask.duration / 60)}h ${editTask.duration % 60 > 0 ? `${editTask.duration % 60}m` : ''}`;
+
+      toast.success(`Task updated successfully! (${durationText}) Priority: ${editTask.priority}`);
+
+      setEditingTask(null);
+      setEditTask({
+        title: '',
+        description: '',
+        priority: 'medium',
+        category: 'General',
+        estimatedPomodoros: 1,
+        duration: 30
+      });
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast.error('Failed to update task. Please try again.');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTask(null);
+    setEditTask({
       title: '',
       description: '',
       priority: 'medium',
       category: 'General',
-      estimatedPomodoros: 1
+      estimatedPomodoros: 1,
+      duration: 30
     });
-    setShowAddForm(false);
   };
 
   const handleStartTaskTimer = (task: Task) => {
@@ -202,6 +298,68 @@ export default function TaskManager({
               </div>
             </div>
 
+            {/* Task Duration Section */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Task Duration (minutes)
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="5"
+                  max="480"
+                  step="5"
+                  value={newTask.duration}
+                  onChange={(e) => setNewTask(prev => ({ 
+                    ...prev, 
+                    duration: parseInt(e.target.value) || 30 
+                  }))}
+                  className="w-24"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setNewTask(prev => ({ ...prev, duration: 15 }))}
+                    className={newTask.duration === 15 ? 'bg-blue-100' : ''}
+                  >
+                    15m
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setNewTask(prev => ({ ...prev, duration: 30 }))}
+                    className={newTask.duration === 30 ? 'bg-blue-100' : ''}
+                  >
+                    30m
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setNewTask(prev => ({ ...prev, duration: 60 }))}
+                    className={newTask.duration === 60 ? 'bg-blue-100' : ''}
+                  >
+                    1h
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setNewTask(prev => ({ ...prev, duration: 120 }))}
+                    className={newTask.duration === 120 ? 'bg-blue-100' : ''}
+                  >
+                    2h
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                How long will this task take to complete?
+              </p>
+            </div>
+
             <div className="flex space-x-3">
               <Button onClick={handleAddTask} className="bg-green-500 hover:bg-green-600">
                 <Plus className="w-4 h-4 mr-2" />
@@ -216,7 +374,165 @@ export default function TaskManager({
             </div>
           </CardContent>
         </Card>
-      )}      {/* Filters and Search */}
+      )}
+
+      {/* Edit Task Form */}
+      {editingTask && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardHeader>
+            <CardTitle>EDIT TASK: {editingTask.title}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Task Title *
+              </label>
+              <Input
+                value={editTask.title}
+                onChange={(e) => setEditTask(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter task title..."
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
+              <Textarea
+                value={editTask.description}
+                onChange={(e) => setEditTask(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Task description..."
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Priority
+                </label>
+                <select
+                  value={editTask.priority}
+                  onChange={(e) => setEditTask(prev => ({ 
+                    ...prev, 
+                    priority: e.target.value as 'low' | 'medium' | 'high' | 'urgent'
+                  }))}
+                  className="w-full p-2 border border-gray-300 rounded-md"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category
+                </label>
+                <Input
+                  value={editTask.category}
+                  onChange={(e) => setEditTask(prev => ({ ...prev, category: e.target.value }))}
+                  placeholder="Category"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Estimated Pomodoros
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={editTask.estimatedPomodoros}
+                  onChange={(e) => setEditTask(prev => ({ 
+                    ...prev, 
+                    estimatedPomodoros: parseInt(e.target.value) || 1 
+                  }))}
+                />
+              </div>
+            </div>
+
+            {/* Task Duration Section */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Task Duration (minutes)
+              </label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="5"
+                  max="480"
+                  step="5"
+                  value={editTask.duration}
+                  onChange={(e) => setEditTask(prev => ({ 
+                    ...prev, 
+                    duration: parseInt(e.target.value) || 30 
+                  }))}
+                  className="w-24"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditTask(prev => ({ ...prev, duration: 15 }))}
+                    className={editTask.duration === 15 ? 'bg-orange-100' : ''}
+                  >
+                    15m
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditTask(prev => ({ ...prev, duration: 30 }))}
+                    className={editTask.duration === 30 ? 'bg-orange-100' : ''}
+                  >
+                    30m
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditTask(prev => ({ ...prev, duration: 60 }))}
+                    className={editTask.duration === 60 ? 'bg-orange-100' : ''}
+                  >
+                    1h
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditTask(prev => ({ ...prev, duration: 120 }))}
+                    className={editTask.duration === 120 ? 'bg-orange-100' : ''}
+                  >
+                    2h
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                How long will this task take to complete?
+              </p>
+            </div>
+
+            <div className="flex space-x-3">
+              <Button onClick={handleUpdateTask} className="bg-orange-500 hover:bg-orange-600">
+                <Edit3 className="w-4 h-4 mr-2" />
+                UPDATE TASK
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleCancelEdit}
+              >
+                CANCEL
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filters and Search */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4 items-center">
@@ -329,6 +645,17 @@ export default function TaskManager({
                           <Clock className="w-4 h-4" />
                           <span>{task.completedPomodoros}/{task.estimatedPomodoros} pomodoros</span>
                         </span>
+                        {task.duration && (
+                          <span className="flex items-center space-x-1">
+                            <Clock className="w-4 h-4" />
+                            <span className="font-medium text-blue-600">
+                              {task.duration < 60 
+                                ? `${task.duration}m` 
+                                : `${Math.floor(task.duration / 60)}h ${task.duration % 60 > 0 ? `${task.duration % 60}m` : ''}`
+                              }
+                            </span>
+                          </span>
+                        )}
                         <span className="flex items-center space-x-1">
                           <Target className="w-4 h-4" />
                           <span>{task.category}</span>
@@ -341,16 +668,8 @@ export default function TaskManager({
                         )}
                       </div>
 
-                      {!task.isCompleted && (
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => selectTask(task)}
-                            className={currentTask?.id === task.id ? 'bg-blue-100' : ''}
-                          >
-                            {currentTask?.id === task.id ? 'SELECTED' : 'SELECT'}
-                          </Button>
+                      <div className="flex space-x-2">
+                        {!task.isCompleted && (
                           <Button
                             size="sm"
                             onClick={() => handleStartTaskTimer(task)}
@@ -359,8 +678,32 @@ export default function TaskManager({
                             <Play className="w-4 h-4 mr-1" />
                             START
                           </Button>
-                        </div>
-                      )}
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditTask(task)}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              await deleteTask(task.id);
+                              toast.success('Task deleted successfully');
+                            } catch (error) {
+                              console.error('Error deleting task:', error);
+                              toast.error('Failed to delete task. Please try again.');
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
 
                     {/* Progress Bar */}

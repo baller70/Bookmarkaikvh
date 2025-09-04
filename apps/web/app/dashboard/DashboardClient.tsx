@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'next/navigation';
 import { useAnalytics } from '../../src/hooks/useAnalytics'
+import { usePomodoro } from '../../src/features/pomodoro/hooks/usePomodoro'
 
 // Helper function to create a Supabase client
 import { createClient } from '@supabase/supabase-js'
@@ -105,6 +106,9 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../src/components/ui/tabs'
+import { ARPTab } from '../../src/features/arp/components/ARPTab'
+import { CommentTab } from '../../src/features/comments/components/CommentTab'
+import { GoalEditDialog } from '../../src/features/goals/components/GoalEditDialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../src/components/ui/tooltip'
 import {
   DndContext,
@@ -132,11 +136,14 @@ const NotificationTab = dynamic(() => import('../../src/features/notifications')
 const TimerTab = dynamic(() => import('../../src/features/pomodoro/components/TimerTab').then(m => m.default), { ssr: false, loading: () => <div /> })
 const MediaHub = dynamic(() => import('../../src/features/media').then(m => m.MediaHub), { ssr: false, loading: () => <div /> })
 const SimpleBoardCanvas = dynamic(() => import('../../src/features/simpleBoard/SimpleBoardCanvas').then(m => m.SimpleBoardCanvas), { ssr: false, loading: () => <div /> })
+const BookmarkTimeline = dynamic(() => import('../../src/features/timeline/components/BookmarkTimeline').then(m => m.BookmarkTimeline), { ssr: false, loading: () => <div /> })
 const FolderOrgChartView = dynamic(() => import('../../src/components/ui/folder-org-chart-view').then(m => m.FolderOrgChartView), { ssr: false, loading: () => <div /> })
 const KanbanView = dynamic(() => import('../../src/components/ui/BookmarkKanban').then(m => m.KanbanView), { ssr: false, loading: () => <div /> })
 const TrelloBoard = dynamic(() => import('../../src/components/ui/TrelloBoard').then(m => m.default), { ssr: false, loading: () => <div /> })
+const KanbanBoard2 = dynamic(() => import('../../src/features/kanban/components/KanbanBoard2').then(m => m.KanbanBoard2), { ssr: false, loading: () => <div /> })
 const DnaSearch = dynamic(() => import('../../src/components/dna-profile/dna-search').then(m => m.default), { ssr: false, loading: () => <div /> })
-const Oracle = dynamic(() => import('../../src/components/oracle/Oracle').then(m => m.default), { ssr: false, loading: () => <div /> })
+// Temporarily disabled to fix user undefined error
+// const Oracle = dynamic(() => import('../../src/components/oracle/Oracle').then(m => m.default), { ssr: false, loading: () => <div /> })
 
 const InfinityBoardBackground = dynamic(() => import('../../src/features/infinity-board/InfinityBoard').then(m => m.InfinityBoardBackground), { ssr: false, loading: () => null })
 const KHV1InfinityBoard = dynamic(() => import('../../src/features/infinity-board/InfinityBoard').then(m => m.KHV1InfinityBoard), { ssr: false, loading: () => <div className="p-4">Loading board…</div> })
@@ -255,7 +262,10 @@ export default function Dashboard() {
       goal_status: 'in_progress',
       goal_priority: 'high',
       goal_progress: 65,
-      goal_notes: 'Making good progress on React hooks'
+      goal_notes: 'Making good progress on React hooks',
+      connected_bookmarks: [],
+      tags: ['learning', 'react', 'typescript'],
+      notes: 'Making good progress on React hooks'
     },
     {
       id: '2',
@@ -268,7 +278,10 @@ export default function Dashboard() {
       goal_status: 'pending',
       goal_priority: 'medium',
       goal_progress: 25,
-      goal_notes: 'Need to start organizing soon'
+      goal_notes: 'Need to start organizing soon',
+      connected_bookmarks: [],
+      tags: ['organization', 'productivity'],
+      notes: 'Need to start organizing soon'
     },
     {
       id: '3',
@@ -281,7 +294,10 @@ export default function Dashboard() {
       goal_status: 'in_progress',
       goal_priority: 'low',
       goal_progress: 40,
-      goal_notes: 'Focusing on Next.js 14 and React Server Components'
+      goal_notes: 'Focusing on Next.js 14 and React Server Components',
+      connected_bookmarks: [],
+      tags: ['research', 'nextjs', 'react'],
+      notes: 'Focusing on Next.js 14 and React Server Components'
     }
   ]);
 
@@ -304,6 +320,45 @@ export default function Dashboard() {
     getBookmarkAnalytics: getSelectedBookmarkAnalytics,
     refreshAnalytics: refreshSelectedBookmarkAnalytics,
   } = useAnalytics(selectedBookmark?.id);
+
+  // Pomodoro hook to get tasks data (global for compatibility)
+  const pomodoroHook = usePomodoro();
+  const { tasks: pomodoroTasks } = pomodoroHook;
+
+  // State to store tasks for each bookmark
+  const [bookmarkTasks, setBookmarkTasks] = useState<{[key: string]: any[]}>({});
+
+  // Function to load tasks for a specific bookmark
+  const loadBookmarkTasks = async (bookmarkId: string) => {
+    try {
+      const response = await fetch(`/api/pomodoro?bookmarkId=${encodeURIComponent(bookmarkId)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setBookmarkTasks(prev => ({
+          ...prev,
+          [bookmarkId]: data.tasks || []
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading tasks for bookmark:', bookmarkId, error);
+    }
+  };
+
+  // Load tasks for all bookmarks when they change
+  useEffect(() => {
+    if (bookmarks && bookmarks.length > 0) {
+      bookmarks.forEach(bookmark => {
+        if (bookmark.id && !bookmarkTasks[bookmark.id]) {
+          loadBookmarkTasks(bookmark.id);
+        }
+      });
+    }
+  }, [bookmarks]);
+
+  // Helper function to get tasks for a specific bookmark
+  const getTasksForBookmark = (bookmarkId: string) => {
+    return bookmarkTasks[bookmarkId] || [];
+  };
 
   // Combined tracking functions that update both global and selected bookmark analytics
   const trackVisitCombined = async (bookmarkId: string) => {
@@ -1556,7 +1611,8 @@ export default function Dashboard() {
           notes: updatedBookmark.notes || '',
           ai_summary: updatedBookmark.ai_summary || '',
           ai_tags: updatedBookmark.ai_tags || [],
-          ai_category: updatedBookmark.ai_category || updatedBookmark.category || ''
+          ai_category: updatedBookmark.ai_category || updatedBookmark.category || '',
+          isFavorite: newFavoriteStatus
         })
       })
 
@@ -2842,7 +2898,8 @@ export default function Dashboard() {
               <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">OPEN TASK</span>
             </div>
             <span className="text-xs text-gray-500 font-medium">TOTAL: {(() => {
-              const tasks = (bookmark.tasks || []) as Array<{ isCompleted?: boolean }>
+              // Show tasks for this specific bookmark
+              const tasks = getTasksForBookmark(bookmark.id);
               return tasks.filter(t => !t.isCompleted).length
             })()}</span>
           </div>
@@ -2851,13 +2908,15 @@ export default function Dashboard() {
               <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">COMPLETED TASK</span>
             </div>
             <span className="text-xs text-gray-500 font-medium">TOTAL: {(() => {
-              const tasks = (bookmark.tasks || []) as Array<{ isCompleted?: boolean }>
+              // Show tasks for this specific bookmark
+              const tasks = getTasksForBookmark(bookmark.id);
               return tasks.filter(t => !!t.isCompleted).length
             })()}</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             {(() => {
-              const t = (bookmark.tasks || []) as Array<{estimatedPomodoros?:number; completedPomodoros?:number; isCompleted?:boolean}>
+              // Show progress for this specific bookmark
+              const t = getTasksForBookmark(bookmark.id);
               const pct = (() => {
                 if (!t.length) return (bookmark.project?.progress || 0)
                 const totals = t.reduce((acc,task)=>{
@@ -2878,7 +2937,8 @@ export default function Dashboard() {
           <div className="flex justify-between items-center mt-1">
             <span className="text-xs text-gray-500">Progress</span>
             <span className="text-xs font-semibold text-green-600">{(() => {
-              const t = (bookmark.tasks || []) as Array<{estimatedPomodoros?:number; completedPomodoros?:number; isCompleted?:boolean}>
+              // Show progress for this specific bookmark
+              const t = getTasksForBookmark(bookmark.id);
               if (!t.length) return bookmark.project?.progress || 0
               const totals = t.reduce((acc,task)=>{
                 const est = Math.max(0, Number(task.estimatedPomodoros||0))
@@ -4097,14 +4157,26 @@ export default function Dashboard() {
           </div>
         )
       case 'timeline':
-        console.log('🕒 Rendering timeline view with SimpleBoardCanvas');
+        console.log('🕒 Rendering timeline view with BookmarkTimeline');
         return (
-          <div className="w-full h-screen">
-            <SimpleBoardCanvas 
-              key="timeline-board" 
-              onBookmarkClick={handleBookmarkClick} 
-            />
-          </div>
+          <BookmarkTimeline 
+            bookmarks={filteredBookmarks}
+            userDefaultLogo={userDefaultLogo}
+            onBookmarkClick={(bookmark) => {
+              setSelectedBookmark(bookmark);
+              setIsModalOpen(true);
+            }}
+            onBookmarkUpdate={(bookmark) => {
+              // Update bookmark in the bookmarks array
+              setBookmarks(prev => prev.map(b => b.id === bookmark.id ? bookmark : b));
+              showNotification('Bookmark updated successfully!');
+            }}
+            onBookmarkDelete={(bookmarkId) => {
+              // Delete bookmark from the bookmarks array
+              setBookmarks(prev => prev.filter(b => b.id.toString() !== bookmarkId));
+              showNotification('Bookmark deleted successfully!');
+            }}
+          />
         )
       case 'hierarchyV1':
         return (
@@ -4298,32 +4370,61 @@ export default function Dashboard() {
       case 'goal2':
         const handleGoalEdit = (folder: Folder) => {
           console.log('Edit goal folder:', folder);
-          showNotification(`Edit goal folder: ${folder.name}`);
+          setSelectedGoalFolder(folder);
+          setGoalDialogOpen(true);
         };
 
         const handleGoalDelete = (folderId: string) => {
           console.log('Delete goal folder:', folderId);
-          showNotification(`Delete goal folder: ${folderId}`);
+          setMockGoalFolders(prev => prev.filter(goal => goal.id !== folderId));
+          showNotification(`Goal deleted successfully!`);
         };
 
         const handleGoalAddBookmark = (folderId: string) => {
           console.log('Add bookmark to goal folder:', folderId);
-          showNotification(`Add bookmark to goal folder: ${folderId}`);
+          // Find the goal and open bookmark selection
+          const goal = mockGoalFolders.find(g => g.id === folderId);
+          if (goal) {
+            setSelectedGoalFolder(goal);
+            setGoalDialogOpen(true);
+          }
         };
 
         const handleGoalDrop = (folderId: string, bookmark: BookmarkWithRelations) => {
           console.log('Drop bookmark to goal folder:', folderId, bookmark);
-          showNotification(`Moved "${bookmark.title}" to goal folder`);
+          // Add bookmark to goal's connected bookmarks
+          setMockGoalFolders(prev => prev.map(goal => 
+            goal.id === folderId 
+              ? { 
+                  ...goal, 
+                  connected_bookmarks: [...(goal.connected_bookmarks || []), bookmark.id.toString()]
+                }
+              : goal
+          ));
+          showNotification(`Bookmark "${bookmark.title}" connected to goal!`);
         };
 
         const handleGoalDragOver = (event: React.DragEvent) => {
           event.preventDefault();
         };
 
-        const handleGoalSubmit = (data: { name: string; description?: string; color?: string; reminder_at?: string | null }) => {
-          console.log('Goal folder submitted:', data);
-          showNotification(`Goal folder "${data.name}" ${selectedGoalFolder ? 'updated' : 'created'} successfully!`);
+        const handleGoalSubmit = (goalData: any) => {
+          console.log('Goal submitted:', goalData);
+          
+          if (selectedGoalFolder) {
+            // Update existing goal
+            setMockGoalFolders(prev => prev.map(goal => 
+              goal.id === selectedGoalFolder.id ? goalData : goal
+            ));
+            showNotification(`Goal "${goalData.name}" updated successfully!`);
+          } else {
+            // Create new goal
+            setMockGoalFolders(prev => [...prev, goalData]);
+            showNotification(`Goal "${goalData.name}" created successfully!`);
+          }
+          
           setSelectedGoalFolder(null);
+          setGoalDialogOpen(false);
         };
 
         return (
@@ -4355,15 +4456,13 @@ export default function Dashboard() {
                 <SortableContext items={mockGoalFolders.map(f => f.id)} strategy={rectSortingStrategy}>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {mockGoalFolders.map((folder) => {
-                      const folderBookmarks = bookmarks.filter(bookmark => 
-                        bookmark.category.toLowerCase().includes(folder.name.toLowerCase().split(' ')[0])
-                      );
+                      const connectedBookmarksCount = folder.connected_bookmarks?.length || 0;
                       
                       return (
                         <SortableGoalFolderCard
                           key={folder.id}
                           folder={folder}
-                          bookmarkCount={folderBookmarks.length}
+                          bookmarkCount={connectedBookmarksCount}
                           onEdit={handleGoalEdit}
                           onDelete={handleGoalDelete}
                           onAddBookmark={handleGoalAddBookmark}
@@ -4371,7 +4470,7 @@ export default function Dashboard() {
                           onDragOver={handleGoalDragOver}
                           onClick={(e) => {
                             e.preventDefault();
-                            handleGoalSubmit(folder);
+                            handleGoalEdit(folder);
                           }}
                         />
                       );
@@ -4381,25 +4480,35 @@ export default function Dashboard() {
               </DndContext>
             </ClientOnlyDndProvider>
             
-            <FolderFormDialog
+            <GoalEditDialog
               open={goalDialogOpen}
               onOpenChange={setGoalDialogOpen}
-              folder={selectedGoalFolder}
+              goal={selectedGoalFolder}
               onSubmit={handleGoalSubmit}
+              bookmarks={bookmarks}
             />
           </div>
         )
       case 'kanban2':
-        // Convert bookmarks to the format expected by TrelloBoard
-        const bookmarkItems = filteredBookmarks.map(bookmark => ({
-          id: bookmark.id.toString(),
-          title: bookmark.title,
-          url: bookmark.url,
-          favicon: `https://www.google.com/s2/favicons?domain=${extractDomain(bookmark.url)}&sz=64`
-        }));
-
         return (
-          <TrelloBoard />
+          <KanbanBoard2 
+            bookmarks={filteredBookmarks}
+            onBookmarkClick={(card) => {
+              // Find the bookmark by URL or ID
+              const bookmark = bookmarks.find(b => b.url === card.url || b.id.toString() === card.id);
+              if (bookmark) {
+                setSelectedBookmark(bookmark);
+                setIsModalOpen(true);
+              } else if (card.url) {
+                // Open URL in new tab if bookmark not found
+                window.open(card.url, '_blank');
+              }
+            }}
+            onSave={(boards) => {
+              console.log('Kanban boards saved:', boards);
+              showNotification('Kanban board updated successfully!');
+            }}
+          />
         )
       default: // grid
         return (
@@ -4619,8 +4728,8 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Oracle Component */}
-          <Oracle />
+          {/* Oracle Component - Temporarily disabled to fix user undefined error */}
+          {/* <Oracle /> */}
 
           {/* Bulk Actions Toolbar - Enhanced visibility */}
           {selectedBookmarks.length > 0 && (
@@ -5259,45 +5368,89 @@ export default function Dashboard() {
                             size="sm"
                             variant="outline"
                             className="absolute -bottom-2 -right-2 rounded-full h-8 w-8 p-0 bg-white shadow-md"
-                            onClick={() => {
+                            onClick={async () => {
+                              if (!selectedBookmark) return;
+                              
                               const input = document.createElement('input');
                               input.type = 'file';
                               input.accept = 'image/*';
-                              input.onchange = (e) => {
+                              input.onchange = async (e) => {
                                 const file = (e.target as HTMLInputElement).files?.[0];
-                                if (file) {
-                                  // Validate file size (max 5MB)
-                                  if (file.size > 5 * 1024 * 1024) {
-                                    alert('File size must be less than 5MB');
-                                    return;
-                                  }
+                                if (!file) return;
+
+                                // Validate file size (max 5MB)
+                                if (file.size > 5 * 1024 * 1024) {
+                                  showNotification('File size must be less than 5MB');
+                                  return;
+                                }
+                                
+                                // Validate file type
+                                if (!file.type.startsWith('image/')) {
+                                  showNotification('Please select a valid image file');
+                                  return;
+                                }
+
+                                try {
+                                  setUploadingBackground(true);
+                                  showNotification('Uploading logo image...');
+
+                                  // Upload to server
+                                  const formData = new FormData();
+                                  formData.append('file', file);
+                                  formData.append('type', 'logo');
+                                  formData.append('tags', `bookmark-${selectedBookmark.id},logo`);
+
+                                  const uploadResponse = await fetch('/api/user-data/upload', {
+                                    method: 'POST',
+                                    body: formData
+                                  });
+
+                                  const uploadResult = await uploadResponse.json();
                                   
-                                  // Validate file type
-                                  if (!file.type.startsWith('image/')) {
-                                    alert('Please select a valid image file');
-                                    return;
+                                  if (!uploadResult.success) {
+                                    throw new Error(uploadResult.error || 'Upload failed');
                                   }
+
+                                  const imageUrl = uploadResult.data.url;
+
+                                  // Update bookmark with new logo
+                                  const response = await fetch('/api/bookmarks', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      id: selectedBookmark.id,
+                                      title: selectedBookmark.title,
+                                      url: selectedBookmark.url,
+                                      description: selectedBookmark.description || '',
+                                      category: selectedBookmark.category || '',
+                                      tags: Array.isArray(selectedBookmark.tags) ? selectedBookmark.tags : [],
+                                      notes: selectedBookmark.notes || '',
+                                      ai_summary: selectedBookmark.ai_summary || '',
+                                      ai_tags: selectedBookmark.ai_tags || [],
+                                      ai_category: selectedBookmark.ai_category || selectedBookmark.category || '',
+                                      isFavorite: selectedBookmark.isFavorite || false,
+                                      circularImage: imageUrl
+                                    })
+                                  });
+
+                                  const result = await response.json();
                                   
-                                  const reader = new FileReader();
-                                  reader.onload = (event) => {
-                                    const imageDataUrl = event.target?.result as string;
-                                    
-                                    // Update the bookmark in the bookmarks array
+                                  if (result.success) {
+                                    // Update UI
+                                    const updatedBookmark = { ...selectedBookmark, circularImage: imageUrl };
                                     setBookmarks(prev => prev.map(bookmark => 
-                                      bookmark.id === selectedBookmark.id 
-                                        ? { ...bookmark, circularImage: imageDataUrl }
-                                        : bookmark
+                                      bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
                                     ));
-                                    
-                                    // Update the selected bookmark for immediate UI update
-                                    setSelectedBookmark(prev => prev ? { ...prev, circularImage: imageDataUrl } : prev);
-                                    
-                                    console.log('Image updated successfully for bookmark:', selectedBookmark.id);
-                                  };
-                                  reader.onerror = () => {
-                                    alert('Error reading file. Please try again.');
-                                  };
-                                  reader.readAsDataURL(file);
+                                    setSelectedBookmark(updatedBookmark);
+                                    showNotification('Logo updated successfully!');
+                                  } else {
+                                    throw new Error(result.error || 'Failed to save logo');
+                                  }
+                                } catch (error) {
+                                  console.error('Logo upload error:', error);
+                                  showNotification('Failed to upload logo. Please try again.');
+                                } finally {
+                                  setUploadingBackground(false);
                                 }
                               };
                               input.click();
@@ -5312,7 +5465,94 @@ export default function Dashboard() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={openDefaultLogoModal}
+                          onClick={async () => {
+                            if (!selectedBookmark) return;
+                            
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.onchange = async (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (!file) return;
+
+                              // Validate file size (max 5MB)
+                              if (file.size > 5 * 1024 * 1024) {
+                                showNotification('File size must be less than 5MB');
+                                return;
+                              }
+                              
+                              // Validate file type
+                              if (!file.type.startsWith('image/')) {
+                                showNotification('Please select a valid image file');
+                                return;
+                              }
+
+                              try {
+                                setUploadingBackground(true);
+                                showNotification('Uploading default logo...');
+
+                                // Upload to server
+                                const formData = new FormData();
+                                formData.append('file', file);
+                                formData.append('type', 'logo');
+                                formData.append('tags', `bookmark-${selectedBookmark.id},default-logo`);
+
+                                const uploadResponse = await fetch('/api/user-data/upload', {
+                                  method: 'POST',
+                                  body: formData
+                                });
+
+                                const uploadResult = await uploadResponse.json();
+                                
+                                if (!uploadResult.success) {
+                                  throw new Error(uploadResult.error || 'Upload failed');
+                                }
+
+                                const imageUrl = uploadResult.data.url;
+
+                                // Update bookmark with new default logo
+                                const response = await fetch('/api/bookmarks', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    id: selectedBookmark.id,
+                                    title: selectedBookmark.title,
+                                    url: selectedBookmark.url,
+                                    description: selectedBookmark.description || '',
+                                    category: selectedBookmark.category || '',
+                                    tags: Array.isArray(selectedBookmark.tags) ? selectedBookmark.tags : [],
+                                    notes: selectedBookmark.notes || '',
+                                    ai_summary: selectedBookmark.ai_summary || '',
+                                    ai_tags: selectedBookmark.ai_tags || [],
+                                    ai_category: selectedBookmark.ai_category || selectedBookmark.category || '',
+                                    isFavorite: selectedBookmark.isFavorite || false,
+                                    logo: imageUrl
+                                  })
+                                });
+
+                                const result = await response.json();
+                                
+                                if (result.success) {
+                                  // Update UI
+                                  const updatedBookmark = { ...selectedBookmark, logo: imageUrl };
+                                  setBookmarks(prev => prev.map(bookmark => 
+                                    bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
+                                  ));
+                                  setSelectedBookmark(updatedBookmark);
+                                  showNotification('Default logo set successfully!');
+                                } else {
+                                  throw new Error(result.error || 'Failed to save default logo');
+                                }
+                              } catch (error) {
+                                console.error('Default logo upload error:', error);
+                                showNotification('Failed to upload default logo. Please try again.');
+                              } finally {
+                                setUploadingBackground(false);
+                              }
+                            };
+                            input.click();
+                          }}
+                          disabled={uploadingBackground}
                           className="text-xs"
                         >
                           <ImageIcon className="h-3 w-3 mr-2" />
@@ -5322,7 +5562,93 @@ export default function Dashboard() {
                           <Button
                             variant="default"
                             size="sm"
-                            onClick={handleReplaceFront}
+                            onClick={async () => {
+                              if (!selectedBookmark) return;
+                              
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = 'image/*';
+                              input.onchange = async (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
+                                if (!file) return;
+
+                                // Validate file size (max 5MB)
+                                if (file.size > 5 * 1024 * 1024) {
+                                  showNotification('File size must be less than 5MB');
+                                  return;
+                                }
+                                
+                                // Validate file type
+                                if (!file.type.startsWith('image/')) {
+                                  showNotification('Please select a valid image file');
+                                  return;
+                                }
+
+                                try {
+                                  setUploadingBackground(true);
+                                  showNotification('Uploading background image...');
+
+                                  // Upload to server
+                                  const formData = new FormData();
+                                  formData.append('file', file);
+                                  formData.append('type', 'image');
+                                  formData.append('tags', `bookmark-${selectedBookmark.id},background`);
+
+                                  const uploadResponse = await fetch('/api/user-data/upload', {
+                                    method: 'POST',
+                                    body: formData
+                                  });
+
+                                  const uploadResult = await uploadResponse.json();
+                                  
+                                  if (!uploadResult.success) {
+                                    throw new Error(uploadResult.error || 'Upload failed');
+                                  }
+
+                                  const imageUrl = uploadResult.data.url;
+
+                                  // Update bookmark with new background
+                                  const response = await fetch('/api/bookmarks', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      id: selectedBookmark.id,
+                                      title: selectedBookmark.title,
+                                      url: selectedBookmark.url,
+                                      description: selectedBookmark.description || '',
+                                      category: selectedBookmark.category || '',
+                                      tags: Array.isArray(selectedBookmark.tags) ? selectedBookmark.tags : [],
+                                      notes: selectedBookmark.notes || '',
+                                      ai_summary: selectedBookmark.ai_summary || '',
+                                      ai_tags: selectedBookmark.ai_tags || [],
+                                      ai_category: selectedBookmark.ai_category || selectedBookmark.category || '',
+                                      isFavorite: selectedBookmark.isFavorite || false,
+                                      customBackground: imageUrl
+                                    })
+                                  });
+
+                                  const result = await response.json();
+                                  
+                                  if (result.success) {
+                                    // Update UI
+                                    const updatedBookmark = { ...selectedBookmark, customBackground: imageUrl };
+                                    setBookmarks(prev => prev.map(bookmark => 
+                                      bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
+                                    ));
+                                    setSelectedBookmark(updatedBookmark);
+                                    showNotification('Background updated successfully!');
+                                  } else {
+                                    throw new Error(result.error || 'Failed to save background');
+                                  }
+                                } catch (error) {
+                                  console.error('Background upload error:', error);
+                                  showNotification('Failed to upload background. Please try again.');
+                                } finally {
+                                  setUploadingBackground(false);
+                                }
+                              };
+                              input.click();
+                            }}
                             disabled={uploadingBackground}
                             className="text-xs"
                           >
@@ -5333,45 +5659,89 @@ export default function Dashboard() {
                             size="sm"
                             onClick={async () => {
                               if (!selectedBookmark) return;
+                              
                               const input = document.createElement('input');
                               input.type = 'file';
                               input.accept = 'image/*';
                               input.onchange = async (e) => {
-                                const file = (e.target as HTMLInputElement).files?.[0]
+                                const file = (e.target as HTMLInputElement).files?.[0];
                                 if (!file) return;
-                                setUploadingBackground(true)
-                                try {
-                                  const reader = new FileReader()
-                                  reader.onload = async (e) => {
-                                    const imageDataUrl = e.target?.result as string
-                                    const response = await fetch('/api/bookmarks', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        id: selectedBookmark.id,
-                                        faviconOverride: imageDataUrl,
-                                        // carry along safe fields
-                                        title: selectedBookmark.title,
-                                        url: selectedBookmark.url,
-                                      })
-                                    })
-                                    if (!response.ok) {
-                                      const t = await response.text();
-                                      throw new Error(t)
-                                    }
-                                    // update UI favicon only (top-left small avatar)
-                                    setBookmarks(prev => prev.map(b => String(b.id) === String(selectedBookmark.id) ? { ...b, faviconOverride: imageDataUrl } as any : b))
-                                    setSelectedBookmark(prev => prev ? ({ ...prev, faviconOverride: imageDataUrl } as any) : prev)
-                                    toast.success('✅ Favicon updated!')
-                                  }
-                                  reader.readAsDataURL(file)
-                                } catch (err) {
-                                  console.error(err)
-                                  toast.error('Failed to update favicon')
-                                } finally {
-                                  setUploadingBackground(false)
+
+                                // Validate file size (max 5MB)
+                                if (file.size > 5 * 1024 * 1024) {
+                                  showNotification('File size must be less than 5MB');
+                                  return;
                                 }
-                              }
+                                
+                                // Validate file type
+                                if (!file.type.startsWith('image/')) {
+                                  showNotification('Please select a valid image file');
+                                  return;
+                                }
+
+                                try {
+                                  setUploadingBackground(true);
+                                  showNotification('Uploading favicon...');
+
+                                  // Upload to server
+                                  const formData = new FormData();
+                                  formData.append('file', file);
+                                  formData.append('type', 'image');
+                                  formData.append('tags', `bookmark-${selectedBookmark.id},favicon`);
+
+                                  const uploadResponse = await fetch('/api/user-data/upload', {
+                                    method: 'POST',
+                                    body: formData
+                                  });
+
+                                  const uploadResult = await uploadResponse.json();
+                                  
+                                  if (!uploadResult.success) {
+                                    throw new Error(uploadResult.error || 'Upload failed');
+                                  }
+
+                                  const imageUrl = uploadResult.data.url;
+
+                                  // Update bookmark with new favicon
+                                  const response = await fetch('/api/bookmarks', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      id: selectedBookmark.id,
+                                      title: selectedBookmark.title,
+                                      url: selectedBookmark.url,
+                                      description: selectedBookmark.description || '',
+                                      category: selectedBookmark.category || '',
+                                      tags: Array.isArray(selectedBookmark.tags) ? selectedBookmark.tags : [],
+                                      notes: selectedBookmark.notes || '',
+                                      ai_summary: selectedBookmark.ai_summary || '',
+                                      ai_tags: selectedBookmark.ai_tags || [],
+                                      ai_category: selectedBookmark.ai_category || selectedBookmark.category || '',
+                                      isFavorite: selectedBookmark.isFavorite || false,
+                                      faviconOverride: imageUrl
+                                    })
+                                  });
+
+                                  const result = await response.json();
+                                  
+                                  if (result.success) {
+                                    // Update UI
+                                    const updatedBookmark = { ...selectedBookmark, faviconOverride: imageUrl };
+                                    setBookmarks(prev => prev.map(bookmark => 
+                                      bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
+                                    ));
+                                    setSelectedBookmark(updatedBookmark);
+                                    showNotification('Favicon updated successfully!');
+                                  } else {
+                                    throw new Error(result.error || 'Failed to save favicon');
+                                  }
+                                } catch (error) {
+                                  console.error('Favicon upload error:', error);
+                                  showNotification('Failed to upload favicon. Please try again.');
+                                } finally {
+                                  setUploadingBackground(false);
+                                }
+                              };
                               input.click();
                             }}
                             disabled={uploadingBackground}
@@ -5783,7 +6153,17 @@ export default function Dashboard() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="arp" className="space-y-6">
+                <TabsContent value="arp" className="h-[600px]">
+                  <ARPTab 
+                    bookmarkId={selectedBookmark.id.toString()}
+                    onSave={(sections) => {
+                      console.log('ARP sections saved:', sections);
+                      // TODO: Implement saving ARP data to API
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent value="arp-old" className="space-y-6">
                   {(() => {
                     // Analyze bookmark URL to determine website type and suggest appropriate workflow
                     const getWebsiteType = (url: string): string => {
@@ -6557,7 +6937,7 @@ export default function Dashboard() {
                 </TabsContent>
 
                 <TabsContent value="timer" className="h-[600px]">
-                  <TimerTab />
+                  <TimerTab bookmarkId={String(selectedBookmark?.id || '')} />
                 </TabsContent>
 
                 <TabsContent value="media" className="h-[600px]">
@@ -6570,22 +6950,15 @@ export default function Dashboard() {
                   )}
                 </TabsContent>
 
-                <TabsContent value="comment" className="space-y-4">
-                  <div className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold">Comments</h3>
-                      <Button size="sm">Add Comment</Button>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="font-medium text-sm">You</span>
-                          <span className="text-xs text-gray-500">2 hours ago</span>
-                        </div>
-                        <p className="text-sm">This is a great resource for learning React hooks!</p>
-                      </div>
-                    </div>
-                  </div>
+                <TabsContent value="comment" className="h-[600px]">
+                  <CommentTab 
+                    bookmarkId={selectedBookmark.id.toString()}
+                    bookmarkTitle={selectedBookmark.title}
+                    onSave={(comments) => {
+                      console.log('Comments saved:', comments);
+                      // TODO: Implement saving comments data to API
+                    }}
+                  />
                 </TabsContent>
               </Tabs>
             </>

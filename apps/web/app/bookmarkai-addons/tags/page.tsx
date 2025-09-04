@@ -49,91 +49,70 @@ export default function TagsPage() {
   })
   const [filterType, setFilterType] = useState<'all' | 'popular' | 'recent'>('all')
 
-  // Sample data - replace with actual API calls
+  // Load real tag data from bookmarks API
   useEffect(() => {
-    const sampleTags: Tag[] = [
-      {
-        id: '1',
-        name: 'javascript',
-        description: 'JavaScript programming language resources',
-        color: '#F7DF1E',
-        bookmarkCount: 25,
-        createdAt: '2024-01-15',
-        updatedAt: '2024-01-20',
-        isPopular: true
-      },
-      {
-        id: '2',
-        name: 'react',
-        description: 'React framework and related tools',
-        color: '#61DAFB',
-        bookmarkCount: 18,
-        createdAt: '2024-01-10',
-        updatedAt: '2024-01-18',
-        isPopular: true
-      },
-      {
-        id: '3',
-        name: 'tutorial',
-        description: 'Educational and learning content',
-        color: '#10B981',
-        bookmarkCount: 32,
-        createdAt: '2024-01-05',
-        updatedAt: '2024-01-22',
-        isPopular: true
-      },
-      {
-        id: '4',
-        name: 'api',
-        description: 'API documentation and resources',
-        color: '#8B5CF6',
-        bookmarkCount: 14,
-        createdAt: '2024-01-12',
-        updatedAt: '2024-01-19',
-        isPopular: false
-      },
-      {
-        id: '5',
-        name: 'design',
-        description: 'UI/UX design inspiration',
-        color: '#EC4899',
-        bookmarkCount: 12,
-        createdAt: '2024-01-08',
-        updatedAt: '2024-01-16',
-        isPopular: false
-      },
-      {
-        id: '6',
-        name: 'tools',
-        description: 'Development tools and utilities',
-        color: '#F59E0B',
-        bookmarkCount: 9,
-        createdAt: '2024-01-20',
-        updatedAt: '2024-01-23',
-        isPopular: false
-      },
-      {
-        id: '7',
-        name: 'css',
-        description: 'CSS styling and animations',
-        color: '#1572B6',
-        bookmarkCount: 16,
-        createdAt: '2024-01-14',
-        updatedAt: '2024-01-21',
-        isPopular: true
-      },
-      {
-        id: '8',
-        name: 'nodejs',
-        description: 'Node.js backend development',
-        color: '#339933',
-        bookmarkCount: 11,
-        createdAt: '2024-01-18',
-        updatedAt: '2024-01-24',
-        isPopular: false
+    const loadRealTagData = async () => {
+      try {
+        const response = await fetch('/api/bookmarks');
+        const data = await response.json();
+        
+        if (data.success && data.bookmarks) {
+          // Extract and analyze tags from real bookmarks
+          const tagCounts: { [key: string]: { count: number; bookmarkIds: string[]; latestDate: string } } = {};
+          
+          data.bookmarks.forEach((bookmark: any) => {
+            const tags = [
+              ...(bookmark.tags || []),
+              ...(bookmark.ai_tags || [])
+            ].filter((tag: string) => tag && tag.trim());
+            
+            tags.forEach((tag: string) => {
+              const normalizedTag = tag.toLowerCase().trim();
+              if (!tagCounts[normalizedTag]) {
+                tagCounts[normalizedTag] = { count: 0, bookmarkIds: [], latestDate: bookmark.dateAdded };
+              }
+              tagCounts[normalizedTag].count++;
+              tagCounts[normalizedTag].bookmarkIds.push(bookmark.id);
+              // Keep the latest date
+              if (new Date(bookmark.dateAdded) > new Date(tagCounts[normalizedTag].latestDate)) {
+                tagCounts[normalizedTag].latestDate = bookmark.dateAdded;
+              }
+            });
+          });
+
+          // Convert to Tag format and generate colors
+          const colors = [
+            '#F7DF1E', '#61DAFB', '#10B981', '#8B5CF6', '#EC4899',
+            '#F59E0B', '#1572B6', '#339933', '#EF4444', '#F97316',
+            '#3B82F6', '#14B8A6', '#84CC16', '#A855F7', '#F43F5E'
+          ];
+
+          const realTags: Tag[] = Object.entries(tagCounts)
+            .map(([tagName, data], index) => ({
+              id: `tag-${index + 1}`,
+              name: tagName,
+              description: `Used in ${data.count} bookmark${data.count === 1 ? '' : 's'}`,
+              color: colors[index % colors.length],
+              bookmarkCount: data.count,
+              createdAt: data.latestDate,
+              updatedAt: data.latestDate,
+              isPopular: data.count >= 3 // Consider popular if used 3+ times
+            }))
+            .sort((a, b) => b.bookmarkCount - a.bookmarkCount) // Sort by usage
+            .slice(0, 50); // Limit to top 50 tags
+
+          setTags(realTags);
+        } else {
+          console.warn('No bookmark data available, keeping empty tags');
+          setTags([]);
+        }
+      } catch (error) {
+        console.error('Error loading real tag data:', error);
+        setTags([]);
       }
-    ]
-    setTags(sampleTags)
+    };
+
+    loadRealTagData();
   }, [])
 
   const filteredTags = tags.filter(tag => {

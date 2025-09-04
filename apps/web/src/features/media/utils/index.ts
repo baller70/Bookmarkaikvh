@@ -8,14 +8,27 @@ export function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-export function formatDate(date: Date): string {
+export function formatDate(date: Date | string | null | undefined): string {
+  // Handle null/undefined dates
+  if (!date) {
+    return 'Unknown';
+  }
+  
+  // Convert string dates to Date objects
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  // Check if the date is valid
+  if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+    return 'Invalid Date';
+  }
+  
   // Return a simple format during SSR to avoid hydration mismatch
   if (typeof window === 'undefined') {
-    return date.toLocaleDateString();
+    return dateObj.toLocaleDateString();
   }
   
   const now = new Date();
-  const diffTime = Math.abs(now.getTime() - date.getTime());
+  const diffTime = Math.abs(now.getTime() - dateObj.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
   if (diffDays === 1) {
@@ -35,9 +48,22 @@ export function formatDate(date: Date): string {
 }
 
 // Client-side only version for dynamic relative time
-export function formatDateRelative(date: Date): string {
+export function formatDateRelative(date: Date | string | null | undefined): string {
+  // Handle null/undefined dates
+  if (!date) {
+    return 'Unknown';
+  }
+  
+  // Convert string dates to Date objects
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  // Check if the date is valid
+  if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+    return 'Invalid Date';
+  }
+  
   const now = new Date();
-  const diffTime = Math.abs(now.getTime() - date.getTime());
+  const diffTime = Math.abs(now.getTime() - dateObj.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
   if (diffDays === 1) {

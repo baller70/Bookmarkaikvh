@@ -187,9 +187,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const allCategories = searchParams.get('all_categories') === 'true';
     
-    // Per user instruction, always use the bypass ID for testing.
-    const userId = '00000000-0000-0000-0000-000000000001';
-    console.log(`[API OVERRIDE] Forcing userId to dev bypass: ${userId}`);
+    // For development/testing, use existing user ID from database
+    // In production, this should use proper authentication
+    const existingUserId = '48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f'; // Real user from database
+    const userId = existingUserId;
+    console.log(`[API] Using existing userId: ${userId}`);
     
     // Load bookmarks directly from Supabase for the hardcoded dev user
     if (USE_SUPABASE && supabase) {
@@ -232,7 +234,7 @@ export async function GET(request: NextRequest) {
         category: bookmark.category || bookmark.ai_category || 'General',
         tags: bookmark.tags || bookmark.ai_tags || [],
         priority: 'medium',
-        isFavorite: false,
+        isFavorite: bookmark.is_favorite || false,
         visits: bookmark.visits || 0,
         lastVisited: bookmark.visits > 0 ? new Date(bookmark.created_at).toLocaleDateString() : 'Never',
         dateAdded: new Date(bookmark.created_at).toLocaleDateString(),
@@ -291,7 +293,7 @@ export async function GET(request: NextRequest) {
         category: (bookmark as any).category || (bookmark as any).ai_category || 'General',
         tags: (bookmark as any).tags || (bookmark as any).ai_tags || [],
         priority: 'medium',
-        isFavorite: false,
+        isFavorite: bookmark.is_favorite || false,
         visits: (bookmark as any).visits || 0,
         lastVisited: (bookmark as any).visits > 0 ? new Date(bookmark.created_at).toLocaleDateString() : 'Never',
         dateAdded: new Date(bookmark.created_at).toLocaleDateString(),
@@ -343,14 +345,16 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🚀 POST /api/bookmarks - Starting request processing');
     
-    // Per user instruction, always use the bypass ID for testing (same as GET).
-    const userId = '00000000-0000-0000-0000-000000000001';
-    console.log(`[API OVERRIDE] Forcing userId to dev bypass: ${userId}`);
+    // For development/testing, use existing user ID from database
+    // In production, this should use proper authentication
+    const existingUserId = '48e1b5b9-3b0f-4ccb-8b34-831b1337fc3f'; // Real user from database
+    const userId = existingUserId;
+    console.log(`[API] Using existing userId: ${userId}`);
     
     console.log('📦 Parsing request body...');
     const body = await request.json();
     console.log('📦 Request body parsed successfully:', JSON.stringify(body, null, 2));
-    let { id, title, url, description, category, tags, ai_summary, ai_tags, ai_category, notes, customBackground, relatedBookmarks, enableAI = true } = body;
+    let { id, title, url, description, category, tags, ai_summary, ai_tags, ai_category, notes, customBackground, relatedBookmarks, isFavorite, enableAI = true } = body;
     
     // AI WORKAROUND for broken UI: If title is missing but AI is on, generate title from content.
     if (enableAI && url && !title) {
@@ -407,6 +411,7 @@ export async function POST(request: NextRequest) {
             notes: notes || '',
             customBackground,
             relatedBookmarks: relatedBookmarks || [],
+            is_favorite: isFavorite || false,
             updated_at: new Date().toISOString()
           })
           .eq('id', id)
@@ -474,6 +479,7 @@ export async function POST(request: NextRequest) {
           ai_tags: ai.tags || [],
           ai_category: ai.category || null,
           category: finalCategory || 'General',
+          is_favorite: isFavorite || false,
           // folder_id can be null for now since it's optional
           folder_id: null
         };

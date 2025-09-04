@@ -10,6 +10,7 @@ export interface NotificationSettings {
   frequency: NotificationFrequency
   deliveryMethods: DeliveryMethod[]
   scheduledTime?: Date
+  duration?: number // Duration in minutes for tasks
   recurringPattern?: RecurringPattern
   isActive: boolean
   createdAt: Date
@@ -21,6 +22,7 @@ export interface NotificationSettings {
 
 export type NotificationType = 
   | 'reminder'
+  | 'task'
   | 'content_change'
   | 'deadline'
   | 'milestone'

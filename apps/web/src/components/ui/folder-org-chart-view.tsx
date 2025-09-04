@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, ChevronDown, Folder as FolderIcon, Bookmark as BookmarkIcon, ArrowLeft, FolderOpen, Crown, Users, User, Settings, Search, SortAsc, SortDesc, Filter, ChevronLeft, ChevronRight, GripVertical, Edit3, X, Briefcase, Target, Star, Building, Lightbulb, Zap, Clock } from 'lucide-react';
+import { Plus, ChevronDown, Folder as FolderIcon, Bookmark as BookmarkIcon, ArrowLeft, FolderOpen, Crown, Users, User, Settings, Search, SortAsc, SortDesc, Filter, ChevronLeft, ChevronRight, GripVertical, Edit3, X, Briefcase, Target, Star, Building, Lightbulb, Zap, Clock, Trash2 } from 'lucide-react';
 import { Button } from './button';
 import { Card, CardContent } from './card';
 import { Input } from './input';
@@ -15,6 +15,7 @@ import {
   DropdownMenuCheckboxItem
 } from './dropdown-menu';
 import { FolderHierarchyManager, type FolderHierarchyAssignment as HierarchyAssignment } from '../hierarchy/Hierarchy';
+import { EnhancedFolderHierarchyManager } from '../hierarchy/EnhancedHierarchy';
 import {
   DndContext,
   closestCenter,
@@ -52,6 +53,7 @@ interface SimpleBookmark {
 interface FolderOrgChartViewProps {
   folders: SimpleFolder[];
   bookmarks: SimpleBookmark[];
+  userDefaultLogo?: string;
   onCreateFolder: () => void;
   onEditFolder: (folder: SimpleFolder) => void;
   onDeleteFolder: (folderId: string) => void;
@@ -79,9 +81,19 @@ interface HierarchySection {
 // Use the type from the hierarchy component
 type FolderHierarchyAssignment = HierarchyAssignment;
 
+// Helper function to extract domain from URL
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return ''
+  }
+}
+
 export function FolderOrgChartView({
   folders,
   bookmarks,
+  userDefaultLogo,
   onCreateFolder,
   onEditFolder,
   onDeleteFolder,
@@ -101,6 +113,56 @@ export function FolderOrgChartView({
   // Hierarchy management state
   const [internalHierarchyAssignments, setInternalHierarchyAssignments] = useState<FolderHierarchyAssignment[]>([]);
   const [isHierarchyManagerOpen, setIsHierarchyManagerOpen] = useState(false);
+  
+  // Hierarchy sections state
+  const [managedHierarchySections, setManagedHierarchySections] = useState(null);
+  const [isLoadingHierarchySections, setIsLoadingHierarchySections] = useState(true);
+
+  // Load hierarchy sections from API
+  useEffect(() => {
+    const loadHierarchySections = async () => {
+      try {
+        setIsLoadingHierarchySections(true);
+        const response = await fetch('/api/hierarchy-sections');
+        if (response.ok) {
+          const data = await response.json();
+          setManagedHierarchySections(data.hierarchySections);
+        } else {
+          console.error('Failed to load hierarchy sections');
+        }
+      } catch (error) {
+        console.error('Error loading hierarchy sections:', error);
+      } finally {
+        setIsLoadingHierarchySections(false);
+      }
+    };
+
+    loadHierarchySections();
+  }, []);
+
+  const handleHierarchySectionsChange = async (sections: any[]) => {
+    setManagedHierarchySections(sections);
+    
+    try {
+      const response = await fetch('/api/hierarchy-sections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ hierarchySections: sections }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to save hierarchy sections');
+        // Optionally show an error message to the user
+      } else {
+        console.log('Hierarchy sections saved successfully');
+        // Force a re-render by updating the key or triggering state change
+      }
+    } catch (error) {
+      console.error('Error saving hierarchy sections:', error);
+    }
+  };
   
   // Use prop assignments if provided, otherwise use internal state
   const hierarchyAssignments = propHierarchyAssignments || internalHierarchyAssignments;
@@ -139,7 +201,35 @@ export function FolderOrgChartView({
     { id: 'collaborators', title: 'COLLABORATORS', iconName: 'User', colorName: 'Green-Emerald', order: 3 },
   ];
 
-  const [hierarchySections, setHierarchySections] = useState<HierarchySection[]>(defaultHierarchySections);
+  // Convert API hierarchy sections format to local format
+  const convertApiSectionsToLocal = (apiSections: any[]): HierarchySection[] => {
+    if (!apiSections) return defaultHierarchySections;
+    
+    return apiSections.map((section, index) => ({
+      id: section.id || section.section_id,
+      title: section.title,
+      iconName: section.icon, // API uses 'icon', local uses 'iconName'
+      colorName: getColorNameFromApiColor(section.color), // Convert color format
+      order: section.position !== undefined ? section.position : index
+    }));
+  };
+  
+  // Helper function to convert API color names to local color names
+  const getColorNameFromApiColor = (apiColor: string): string => {
+    const colorMap: Record<string, string> = {
+      'purple': 'Purple-Blue',
+      'emerald': 'Blue-Cyan', 
+      'orange': 'Green-Emerald',
+      'blue': 'Blue-Cyan',
+      'green': 'Green-Emerald',
+      'red': 'Red-Pink',
+      'gray': 'Gray-Slate'
+    };
+    return colorMap[apiColor] || 'Gray-Slate';
+  };
+
+  // Use managedHierarchySections from API, fallback to default if not loaded
+  const hierarchySections = convertApiSectionsToLocal(managedHierarchySections);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'bookmarks' | 'recent'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -281,7 +371,9 @@ export function FolderOrgChartView({
           comparison = aBookmarks - bBookmarks;
           break;
         case 'recent':
-          comparison = new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime();
+          const aDate = a.created_at ? new Date(a.created_at) : new Date(0);
+          const bDate = b.created_at ? new Date(b.created_at) : new Date(0);
+          comparison = (isNaN(aDate.getTime()) ? 0 : aDate.getTime()) - (isNaN(bDate.getTime()) ? 0 : bDate.getTime());
           break;
       }
       
@@ -406,7 +498,7 @@ export function FolderOrgChartView({
     );
   };
 
-  // Render folder card
+  // Enhanced folder card with modern design
   const renderFolderCard = (folder: SimpleFolder) => {
     const assignment = hierarchyAssignments.find(a => a.folderId === folder.id);
     const level = assignment?.level || 'collaborators';
@@ -418,16 +510,49 @@ export function FolderOrgChartView({
     return (
       <Card 
         key={folder.id}
-        className={`${colorClasses.bg} ${colorClasses.border} border-2 hover:shadow-lg transition-all duration-300 cursor-pointer`}
+        className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-l-4 bg-gradient-to-r from-white to-gray-50/50 hover:scale-[1.02]"
+        style={{ borderLeftColor: folder.color || '#6b7280' }}
         onClick={() => onFolderNavigate(folder.id)}
       >
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-2">
-              <IconComponent className={`h-5 w-5 ${colorClasses.text}`} />
-              <span className={`font-semibold ${colorClasses.text}`}>{folder.name}</span>
+        <CardContent className="p-6">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              {/* Folder Avatar */}
+              <div className="relative">
+                <div 
+                  className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
+                  style={{ backgroundColor: folder.color || '#6b7280' }}
+                >
+                  <IconComponent className="h-6 w-6 text-white" />
+                </div>
+                {level && (
+                  <div className="absolute -top-1 -right-1">
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-white border shadow-sm">
+                      {level.charAt(0).toUpperCase()}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+              
+              {/* Folder Info */}
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-gray-900 text-lg truncate mb-1">{folder.name}</h3>
+                <div className="flex items-center space-x-2">
+                  <Badge variant="outline" className="text-xs">
+                    {level.toUpperCase()}
+                  </Badge>
+                  {folder.created_at && (
+                    <span className="text-xs text-gray-500">
+                      {new Date(folder.created_at).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center space-x-1">
+            
+            {/* Actions */}
+            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -436,9 +561,9 @@ export function FolderOrgChartView({
                     onClick={(e) => {
                       e.stopPropagation();
                     }}
-                    className="h-6 w-6 p-0"
+                    className="h-8 w-8 p-0 hover:bg-gray-100"
                   >
-                    <Edit3 className="h-3 w-3" />
+                    <Settings className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
@@ -462,38 +587,55 @@ export function FolderOrgChartView({
                     }}
                   >
                     <Edit3 className="h-4 w-4 mr-2" />
-                    Rename Card
+                    Edit Folder
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={(e) => {
                       e.stopPropagation();
-                      // TODO: Implement color change functionality
                       console.log('Change color for folder:', folder.id);
                     }}
                   >
                     <div className="h-4 w-4 mr-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500"></div>
                     Change Color
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteFolder(folder.id);
+                    }}
+                    className="text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Folder
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteFolder(folder.id);
-                }}
-                className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-              >
-                <X className="h-3 w-3" />
-              </Button>
             </div>
           </div>
           
+          {/* Statistics */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-gray-600 font-medium">{totalBookmarks} bookmarks</span>
+              <span className="text-gray-500">Progress</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="h-2 rounded-full transition-all duration-500"
+                style={{ 
+                  width: `${Math.min(100, (totalBookmarks / 10) * 100)}%`,
+                  backgroundColor: folder.color || '#6b7280'
+                }}
+              ></div>
+            </div>
+          </div>
+          
+          {/* Bookmarks Preview */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm text-gray-600">
-              <span>{totalBookmarks} bookmarks</span>
-              {totalPages > 1 && (
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Page {currentPage + 1} of {totalPages}</span>
                 <div className="flex items-center space-x-1">
                   <Button
                     variant="ghost"
@@ -507,7 +649,6 @@ export function FolderOrgChartView({
                   >
                     <ChevronLeft className="h-3 w-3" />
                   </Button>
-                  <span className="text-xs">{currentPage + 1}/{totalPages}</span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -521,35 +662,122 @@ export function FolderOrgChartView({
                     <ChevronRight className="h-3 w-3" />
                   </Button>
                 </div>
-              )}
-            </div>
-            
-            {folderBookmarks.length > 0 && (
-              <div className="space-y-1">
-                {folderBookmarks.map(bookmark => (
-                  <div
-                    key={bookmark.id}
-                    className="flex items-center space-x-2 p-1 rounded text-xs hover:bg-white/50 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenDetail(bookmark);
-                    }}
-                  >
-                    <BookmarkIcon className="h-3 w-3 text-gray-500" />
-                    <span className="truncate flex-1">{bookmark.title}</span>
-                  </div>
-                ))}
               </div>
             )}
             
-            {totalBookmarks === 0 && (
-              <div className="text-xs text-gray-500 italic text-center py-2">
-                No bookmarks yet
+            {folderBookmarks.length > 0 ? (
+              <div className="space-y-2">
+                {folderBookmarks.map(bookmark => {
+                  // Theme color for hover effects
+                  const themeColor = '#3b82f6'; // blue-500
+
+                  return (
+                    <div
+                      key={bookmark.id}
+                      className="group/bookmark hover:shadow-2xl transition-all duration-500 cursor-pointer bg-white border border-gray-300 backdrop-blur-sm relative overflow-hidden rounded-lg"
+                      style={{
+                        borderColor: 'rgb(209 213 219)', // gray-300
+                        transition: 'all 0.5s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = themeColor;
+                        e.currentTarget.style.boxShadow = `0 25px 50px -12px ${themeColor}20`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'rgb(209 213 219)';
+                        e.currentTarget.style.boxShadow = '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)';
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenDetail(bookmark);
+                      }}
+                    >
+                      {/* Background Website Logo with 10% opacity - Custom background takes priority */}
+                      {(() => {
+                        if (bookmark.customBackground) {
+                          return (
+                            <div 
+                              className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
+                              style={{
+                                backgroundImage: `url(${bookmark.customBackground})`,
+                                backgroundSize: (bookmark.customBackground && /logo\.clearbit\.com|faviconkit\.com|s2\/favicons/.test(bookmark.customBackground)) ? '140% 140%' : 'cover',
+                                backgroundPosition: 'center',
+                                backgroundRepeat: 'no-repeat',
+                                opacity: 0.10
+                              }}
+                            />
+                          );
+                        } else {
+                          const domain = extractDomain(bookmark.url || '');
+                          const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                          const bg = bookmark.customBackground || userDefaultLogo || faviconUrl;
+                          return (
+                            <div 
+                              className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
+                              style={{
+                                backgroundImage: `url(${bg})`,
+                                backgroundSize: (bg && /logo\.clearbit\.com|faviconkit\.com|s2\/favicons/.test(bg)) ? '140% 140%' : 'cover',
+                                backgroundPosition: 'center',
+                                backgroundRepeat: 'no-repeat',
+                                opacity: 0.10
+                              }}
+                            />
+                          );
+                        }
+                      })()}
+                      
+                      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/3 via-transparent to-purple-500/3 opacity-0 group-hover/bookmark:opacity-100 transition-opacity duration-500" />
+                      
+                      <div className="flex items-center space-x-3 p-2 relative z-20">
+                        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                          <BookmarkIcon className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate group-hover/bookmark:text-blue-600">
+                            {bookmark.title}
+                          </p>
+                          {bookmark.category && (
+                            <p className="text-xs text-gray-500 truncate">
+                              {bookmark.category}
+                            </p>
+                          )}
+                        </div>
+                        <div className="opacity-0 group-hover/bookmark:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <ChevronRight className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
+                  <BookmarkIcon className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-sm text-gray-500 font-medium">No bookmarks yet</p>
+                <p className="text-xs text-gray-400 mt-1">Add bookmarks to get started</p>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="mt-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onAddBookmark) {
+                      onAddBookmark();
+                    } else {
+                      onAddBookmarkToFolder(folder.id);
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Bookmark
+                </Button>
               </div>
             )}
           </div>
-          
-
         </CardContent>
       </Card>
     );
@@ -740,12 +968,14 @@ export function FolderOrgChartView({
         </div>
       </DndContext>
 
-      {/* Hierarchy Manager */}
-      {isHierarchyManagerOpen && (
-        <FolderHierarchyManager
+      {/* Enhanced Hierarchy Manager */}
+      {isHierarchyManagerOpen && !isLoadingHierarchySections && (
+        <EnhancedFolderHierarchyManager
           folders={folders}
           assignments={hierarchyAssignments}
           onAssignmentsChange={setHierarchyAssignments}
+          hierarchySections={managedHierarchySections}
+          onHierarchySectionsChange={handleHierarchySectionsChange}
           isOpen={isHierarchyManagerOpen}
           onToggle={() => setIsHierarchyManagerOpen(false)}
         />

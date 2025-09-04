@@ -25,10 +25,18 @@ if (process.env.NODE_ENV === 'development') {
   }
 }
 
+// Singleton pattern to prevent multiple GoTrueClient instances
+let supabaseInstance: ReturnType<typeof createClient<Database>> | null = null;
+
 // Client for public operations (uses RLS with Clerk user ID)
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: false, // We don't use Supabase auth
-    autoRefreshToken: false,
+export const supabase = (() => {
+  if (!supabaseInstance) {
+    supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false, // We don't use Supabase auth
+        autoRefreshToken: false,
+      }
+    });
   }
-}) 
+  return supabaseInstance;
+})(); 

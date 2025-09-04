@@ -5,6 +5,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { validateUrl as validateUrlSSRF } from '../../../../lib/security/url-validator';
 import { authenticateUser } from '@/lib/auth-utils';
+import { createClient } from '@supabase/supabase-js';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -558,6 +559,11 @@ export async function GET() {
 // POST endpoint - Process bulk links
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
+  
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
   
   return Sentry.startSpan(
     {

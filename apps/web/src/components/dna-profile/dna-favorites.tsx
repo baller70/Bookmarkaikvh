@@ -608,7 +608,13 @@ export default function DnaFavorites() {
 
     switch (sortBy) {
       case 'recent':
-        return filtered.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
+        return filtered.sort((a, b) => {
+          const aDate = a.addedAt ? new Date(a.addedAt) : new Date(0);
+          const bDate = b.addedAt ? new Date(b.addedAt) : new Date(0);
+          const aTime = isNaN(aDate.getTime()) ? 0 : aDate.getTime();
+          const bTime = isNaN(bDate.getTime()) ? 0 : bDate.getTime();
+          return bTime - aTime;
+        })
       case 'most-opened':
         return filtered.sort((a, b) => (b.visitCount || 0) - (a.visitCount || 0))
       case 'alphabetical':

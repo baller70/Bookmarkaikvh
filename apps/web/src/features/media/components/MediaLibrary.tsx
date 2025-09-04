@@ -24,7 +24,9 @@ import {
   Trash2,
   Edit3,
   Eye,
-  Share2
+  Share2,
+  ArrowLeft,
+  ChevronRight
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -32,6 +34,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useMediaLibrary } from '../hooks/useMediaLibrary';
 import { MediaFile, MediaType } from '../types';
 import { formatFileSize, formatDate } from '../utils';
@@ -41,9 +49,10 @@ import { toast } from 'sonner';
 
 interface MediaLibraryProps {
   onDocumentOpen?: (documentId: string) => void;
+  initialFilterType?: 'image' | 'video' | 'audio' | 'document';
 }
 
-export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
+export function MediaLibrary({ onDocumentOpen, initialFilterType }: MediaLibraryProps = {}) {
   const {
     filteredFiles,
     filteredFolders,
@@ -52,31 +61,55 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
     viewMode,
     searchQuery,
     filterType,
+    selectedFolder,
     uploadProgress,
     isUploading,
     uploadFiles,
     deleteFiles,
     createFolder,
-    createDocument,
+    deleteFolder,
+    moveFileToFolder,
+
     toggleFileSelection,
     setViewMode,
     setSearchQuery,
     setFilterType,
     setSelectedFolder,
+    getCurrentFolderPath,
   } = useMediaLibrary();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadingRef = useRef(false);
+  
+  // Preview modal state
+  const [previewFile, setPreviewFile] = useState<MediaFile | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  
+  // Preview functions
+  const openPreview = (file: MediaFile) => {
+    setPreviewFile(file);
+    setIsPreviewOpen(true);
+  };
+  
+  const closePreview = () => {
+    setPreviewFile(null);
+    setIsPreviewOpen(false);
+  };
+  
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [folderName, setFolderName] = useState('');
   const [persistentFiles, setPersistentFiles] = useState<any[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [isUploadingToPersistent, setIsUploadingToPersistent] = useState(false);
-
   // Load persistent files on component mount
   useEffect(() => {
     loadPersistentFiles();
   }, []);
+
+  // Apply filter when initialFilterType prop changes
+  useEffect(() => {
+    setFilterType(initialFilterType);
+  }, [initialFilterType, setFilterType]);
 
   const loadPersistentFiles = async () => {
     // Prevent multiple simultaneous calls using ref (works better than state for race conditions)
@@ -170,6 +203,8 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
     event.preventDefault();
   };
 
+
+
   const getFileIcon = (type: MediaType) => {
     switch (type) {
       case 'image': return <Image className="h-4 w-4" />;
@@ -187,6 +222,8 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
       setShowCreateFolder(false);
     }
   };
+
+
 
   return (
     <div className="min-h-full flex flex-col">
@@ -264,10 +301,7 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
             <FolderPlus className="h-4 w-4 mr-2" />
             New Folder
           </Button>
-          <Button variant="outline" onClick={() => createDocument('Untitled Document')}>
-            <FileText className="h-4 w-4 mr-2" />
-            New Document
-          </Button>
+
           {selectedFiles.length > 0 && (
             <Button variant="destructive" onClick={() => deleteFiles(selectedFiles)}>
               <Trash2 className="h-4 w-4 mr-2" />
@@ -276,6 +310,39 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
           )}
         </div>
       </div>
+
+      {/* Breadcrumb Navigation */}
+      {selectedFolder && (
+        <div className="border-b border-gray-200 px-4 py-2">
+          <div className="flex items-center space-x-2 text-sm">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedFolder(undefined)}
+              className="p-1 h-auto"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to All Files
+            </Button>
+            <ChevronRight className="h-3 w-3 text-gray-400" />
+            <div className="flex items-center space-x-2">
+              {getCurrentFolderPath().map((folder, index) => (
+                <React.Fragment key={folder.id}>
+                  {index > 0 && <ChevronRight className="h-3 w-3 text-gray-400" />}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedFolder(folder.id)}
+                    className="p-1 h-auto text-blue-600 hover:text-blue-800"
+                  >
+                    {folder.name}
+                  </Button>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upload Progress */}
       {uploadProgress.length > 0 && (
@@ -337,36 +404,9 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
-        {/* Persistent Files Section */}
-        {persistentFiles.length > 0 && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Your Saved Files</h2>
-              <Badge variant="secondary">{persistentFiles.length} files</Badge>
-            </div>
-            <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'space-y-2'}>
-              {persistentFiles.map((file) => (
-                <PersistentFileCard 
-                  key={file.id} 
-                  file={file} 
-                  viewMode={viewMode}
-                  onDelete={async (id) => {
-                    try {
-                      await userDataService.deleteMediaFile(id);
-                      setPersistentFiles(prev => prev.filter(f => f.id !== id));
-                      toast.success('File deleted successfully');
-                    } catch (error) {
-                      toast.error('Failed to delete file');
-                    }
-                  }}
-                  getFileIcon={getFileIcon}
-                />
-              ))}
-            </div>
-          </div>
-        )}
 
-        {filteredFolders.length === 0 && filteredFiles.length === 0 && filteredDocuments.length === 0 && persistentFiles.length === 0 ? (
+
+        {filteredFolders.length === 0 && filteredFiles.length === 0 && filteredDocuments.length === 0 ? (
           <div className="text-center py-12">
             <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No files yet</h3>
@@ -387,11 +427,20 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
                 folder={folder} 
                 viewMode={viewMode}
                 onSelect={() => setSelectedFolder(folder.id)}
+                onDelete={(folderId) => {
+                  try {
+                    deleteFolder(folderId);
+                    toast.success('Folder deleted successfully');
+                  } catch (error) {
+                    console.error('Error deleting folder:', error);
+                    toast.error('Failed to delete folder');
+                  }
+                }}
               />
             ))}
 
-            {/* Documents */}
-            {filteredDocuments.map((document) => (
+            {/* Documents - Show rich documents only when filter allows documents */}
+            {(!filterType || filterType === 'document') && filteredDocuments.map((document) => (
               <DocumentCard 
                 key={document.id} 
                 document={document} 
@@ -409,11 +458,89 @@ export function MediaLibrary({ onDocumentOpen }: MediaLibraryProps = {}) {
                 isSelected={selectedFiles.includes(file.id)}
                 onSelect={() => toggleFileSelection(file.id)}
                 getFileIcon={getFileIcon}
+                onPreview={openPreview}
+                onDelete={async (fileId) => {
+                  try {
+                    await deleteFiles([fileId]);
+                    toast.success('File deleted successfully');
+                  } catch (error) {
+                    toast.error('Failed to delete file');
+                  }
+                }}
               />
             ))}
           </div>
         )}
       </div>
+      
+      {/* Preview Modal */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>{previewFile?.name}</DialogTitle>
+          </DialogHeader>
+          {previewFile && (
+            <div className="flex flex-col items-center justify-center p-4">
+              {previewFile.type === 'image' ? (
+                <img
+                  src={previewFile.url}
+                  alt={previewFile.name}
+                  className="max-w-full max-h-[60vh] object-contain rounded-lg"
+                />
+              ) : previewFile.type === 'video' ? (
+                <video
+                  src={previewFile.url}
+                  controls
+                  className="max-w-full max-h-[60vh] rounded-lg"
+                >
+                  Your browser does not support the video tag.
+                </video>
+              ) : previewFile.type === 'audio' ? (
+                <div className="w-full max-w-md">
+                  <div className="text-center mb-4">
+                    <Music className="h-16 w-16 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-600">{previewFile.name}</p>
+                  </div>
+                  <audio
+                    src={previewFile.url}
+                    controls
+                    className="w-full"
+                  >
+                    Your browser does not support the audio tag.
+                  </audio>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <FileIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                  <p className="text-sm text-gray-600 mb-4">
+                    Preview not available for this file type
+                  </p>
+                  <Button onClick={() => window.open(previewFile.url, '_blank')}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download File
+                  </Button>
+                </div>
+              )}
+              
+              {/* File Details */}
+              <div className="mt-4 text-sm text-gray-600 text-center">
+                <p>Size: {formatFileSize(previewFile.size)}</p>
+                <p>Type: {previewFile.mimeType}</p>
+                <p>Uploaded: {formatDate(previewFile.uploadedAt)}</p>
+                {previewFile.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2 justify-center">
+                    {previewFile.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -423,12 +550,15 @@ interface FolderCardProps {
   folder: any;
   viewMode: 'grid' | 'list';
   onSelect: () => void;
+  onDelete: (folderId: string) => void;
 }
 
-function FolderCard({ folder, viewMode, onSelect }: FolderCardProps) {
+function FolderCard({ folder, viewMode, onSelect, onDelete }: FolderCardProps) {
   if (viewMode === 'list') {
     return (
-      <Card className="p-3 hover:shadow-md transition-shadow cursor-pointer" onClick={onSelect}>
+      <Card 
+        className="p-3 hover:shadow-md transition-shadow cursor-pointer"
+      >
         <div className="flex items-center space-x-3">
           <div 
             className="h-8 w-8 rounded-lg flex items-center justify-center"
@@ -436,18 +566,37 @@ function FolderCard({ folder, viewMode, onSelect }: FolderCardProps) {
           >
             <FolderIcon className="h-4 w-4" style={{ color: folder.color }} />
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0" onClick={onSelect}>
             <h3 className="font-medium text-sm truncate">{folder.name}</h3>
             <p className="text-xs text-gray-500">{formatDate(folder.createdAt)}</p>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={onSelect}>
+                <Eye className="h-4 w-4 mr-2" />
+                Open
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-red-600" onClick={() => onDelete(folder.id)}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </Card>
     );
   }
 
   return (
-    <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={onSelect}>
-      <div className="text-center">
+    <Card 
+      className="p-4 hover:shadow-md transition-shadow cursor-pointer group relative"
+    >
+      <div className="text-center" onClick={onSelect}>
         <div 
           className="h-12 w-12 mx-auto rounded-lg flex items-center justify-center mb-2"
           style={{ backgroundColor: folder.color + '20' }}
@@ -456,6 +605,25 @@ function FolderCard({ folder, viewMode, onSelect }: FolderCardProps) {
         </div>
         <h3 className="font-medium text-sm truncate">{folder.name}</h3>
         <p className="text-xs text-gray-500">{formatDate(folder.createdAt)}</p>
+      </div>
+      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+              <MoreVertical className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={onSelect}>
+              <Eye className="h-4 w-4 mr-2" />
+              Open
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-red-600" onClick={() => onDelete(folder.id)}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </Card>
   );
@@ -523,9 +691,11 @@ interface FileCardProps {
   isSelected: boolean;
   onSelect: () => void;
   getFileIcon: (type: MediaType) => React.ReactNode;
+  onPreview: (file: MediaFile) => void;
+  onDelete: (fileId: string) => void;
 }
 
-function FileCard({ file, viewMode, isSelected, onSelect, getFileIcon }: FileCardProps) {
+function FileCard({ file, viewMode, isSelected, onSelect, getFileIcon, onPreview, onDelete }: FileCardProps) {
   if (viewMode === 'list') {
     return (
       <Card 
@@ -566,7 +736,7 @@ function FileCard({ file, viewMode, isSelected, onSelect, getFileIcon }: FileCar
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onPreview(file)}>
                 <Eye className="h-4 w-4 mr-2" />
                 Preview
               </DropdownMenuItem>
@@ -582,7 +752,7 @@ function FileCard({ file, viewMode, isSelected, onSelect, getFileIcon }: FileCar
                 <Edit3 className="h-4 w-4 mr-2" />
                 Rename
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600">
+              <DropdownMenuItem className="text-red-600" onClick={() => onDelete(file.id)}>
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
               </DropdownMenuItem>
@@ -599,6 +769,7 @@ function FileCard({ file, viewMode, isSelected, onSelect, getFileIcon }: FileCar
         isSelected ? 'ring-2 ring-blue-500' : ''
       }`}
       onClick={onSelect}
+      onDoubleClick={() => onPreview(file)}
     >
       <div className="text-center">
         <div className="h-16 w-16 mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-2 overflow-hidden">
@@ -635,10 +806,11 @@ interface PersistentFileCardProps {
   file: any;
   viewMode: 'grid' | 'list';
   onDelete: (id: string) => void;
+  onPreview: (file: any) => void;
   getFileIcon: (type: string) => React.ReactNode;
 }
 
-function PersistentFileCard({ file, viewMode, onDelete, getFileIcon }: PersistentFileCardProps) {
+function PersistentFileCard({ file, viewMode, onDelete, onPreview, getFileIcon }: PersistentFileCardProps) {
   const handleDownload = () => {
     window.open(file.url, '_blank');
   };
@@ -681,6 +853,10 @@ function PersistentFileCard({ file, viewMode, onDelete, getFileIcon }: Persisten
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => onPreview(file)}>
+                <Eye className="h-4 w-4 mr-2" />
+                Preview
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleDownload}>
                 <Download className="h-4 w-4 mr-2" />
                 Download
@@ -701,7 +877,7 @@ function PersistentFileCard({ file, viewMode, onDelete, getFileIcon }: Persisten
   }
 
   return (
-    <Card className="p-4 hover:shadow-md transition-shadow">
+    <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer" onDoubleClick={() => onPreview(file)}>
       <div className="text-center">
         <div className="h-16 w-16 mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-2 overflow-hidden">
           {file.type === 'image' ? (

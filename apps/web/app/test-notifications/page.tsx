@@ -3,10 +3,12 @@
 import { useState } from 'react'
 import { Button } from '@/src/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/src/components/ui/card'
+import { Input } from '@/src/components/ui/input'
 import { toast } from 'sonner'
 
 export default function TestNotifications() {
   const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState('')
 
   const testAPI = async (channel: string) => {
     setLoading(true)
@@ -18,7 +20,7 @@ export default function TestNotifications() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ channel })
+        body: JSON.stringify({ channel, ...(channel === 'email' && email ? { to: email } : {}) })
       })
       
       console.log('Response status:', response.status)
@@ -77,6 +79,17 @@ export default function TestNotifications() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Email input for Resend tests */}
+          <div className="space-y-2">
+            <label className="text-sm text-gray-600">Email recipient (optional)</label>
+            <Input
+              placeholder="you@domain.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <p className="text-xs text-gray-500">Used only for the Email test. If empty, server will use TEST_EMAIL if configured.</p>
+          </div>
+
           <Button 
             onClick={() => testAPI('email')} 
             disabled={loading}

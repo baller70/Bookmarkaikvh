@@ -18,7 +18,7 @@ class UserDataService {
   private baseUrl = '/api/user-data';
 
   // Media Files
-  async uploadFile(file: File, type: 'image' | 'video' | 'document' | 'logo', tags?: string[]): Promise<UserMediaFile> {
+  async uploadFile(file: File, type: 'image' | 'video' | 'audio' | 'document' | 'logo', tags?: string[]): Promise<UserMediaFile> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('type', type);

@@ -32,6 +32,7 @@ export interface MediaFolder {
   createdAt: Date;
   createdBy: string;
   color?: string;
+  type?: MediaType; // Optional: if set, folder only shows in specific media type tab
 }
 
 export interface RichDocument {

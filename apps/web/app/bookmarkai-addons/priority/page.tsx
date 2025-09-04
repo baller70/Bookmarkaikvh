@@ -60,95 +60,145 @@ export default function PriorityPage() {
   })
   const [filterLevel, setFilterLevel] = useState<'all' | '1' | '2' | '3' | '4' | '5'>('all')
 
-  // Sample data - replace with actual API calls
+  // Load real priority data from bookmarks API
   useEffect(() => {
-    const samplePriorities: Priority[] = [
-      {
-        id: '1',
-        name: 'Critical',
-        description: 'Highest priority items that need immediate attention',
-        level: 5,
-        color: '#EF4444',
-        icon: 'alert-circle',
-        bookmarkCount: 8,
-        createdAt: '2024-01-15',
-        updatedAt: '2024-01-20',
-        isDefault: true
-      },
-      {
-        id: '2',
-        name: 'High',
-        description: 'Important items that should be addressed soon',
-        level: 4,
-        color: '#F97316',
-        icon: 'arrow-up',
-        bookmarkCount: 15,
-        createdAt: '2024-01-10',
-        updatedAt: '2024-01-18',
-        isDefault: true
-      },
-      {
-        id: '3',
-        name: 'Medium',
-        description: 'Standard priority for regular items',
-        level: 3,
-        color: '#3B82F6',
-        icon: 'target',
-        bookmarkCount: 25,
-        createdAt: '2024-01-05',
-        updatedAt: '2024-01-22',
-        isDefault: true
-      },
-      {
-        id: '4',
-        name: 'Low',
-        description: 'Items that can be addressed when time permits',
-        level: 2,
-        color: '#10B981',
-        icon: 'arrow-down',
-        bookmarkCount: 12,
-        createdAt: '2024-01-12',
-        updatedAt: '2024-01-19',
-        isDefault: true
-      },
-      {
-        id: '5',
-        name: 'Someday',
-        description: 'Items for future reference with no urgency',
-        level: 1,
-        color: '#6B7280',
-        icon: 'clock',
-        bookmarkCount: 6,
-        createdAt: '2024-01-08',
-        updatedAt: '2024-01-16',
-        isDefault: true
-      },
-      {
-        id: '6',
-        name: 'Learning',
-        description: 'Educational content for skill development',
-        level: 3,
-        color: '#8B5CF6',
-        icon: 'zap',
-        bookmarkCount: 18,
-        createdAt: '2024-01-20',
-        updatedAt: '2024-01-23',
-        isDefault: false
-      },
-      {
-        id: '7',
-        name: 'Work Project',
-        description: 'Resources related to current work projects',
-        level: 4,
-        color: '#EC4899',
-        icon: 'star',
-        bookmarkCount: 22,
-        createdAt: '2024-01-14',
-        updatedAt: '2024-01-21',
-        isDefault: false
+    const loadRealPriorityData = async () => {
+      try {
+        const response = await fetch('/api/bookmarks');
+        const data = await response.json();
+        
+        if (data.success && data.bookmarks) {
+          // Extract and analyze priorities from real bookmarks
+          const priorityCounts: { [key: string]: number } = {};
+          
+          data.bookmarks.forEach((bookmark: any) => {
+            const priority = bookmark.priority || 'medium'; // Default to medium if not set
+            priorityCounts[priority] = (priorityCounts[priority] || 0) + 1;
+          });
+
+          // Create priority entries based on real data
+          const defaultPriorities: Priority[] = [
+            {
+              id: '1',
+              name: 'Critical',
+              description: 'Highest priority items that need immediate attention',
+              level: 5,
+              color: '#EF4444',
+              icon: 'alert-circle',
+              bookmarkCount: priorityCounts['critical'] || 0,
+              createdAt: '2024-01-15',
+              updatedAt: new Date().toISOString().split('T')[0],
+              isDefault: true
+            },
+            {
+              id: '2',
+              name: 'High',
+              description: 'Important items that should be addressed soon',
+              level: 4,
+              color: '#F97316',
+              icon: 'arrow-up',
+              bookmarkCount: priorityCounts['high'] || 0,
+              createdAt: '2024-01-10',
+              updatedAt: new Date().toISOString().split('T')[0],
+              isDefault: true
+            },
+            {
+              id: '3',
+              name: 'Medium',
+              description: 'Standard priority for regular items',
+              level: 3,
+              color: '#3B82F6',
+              icon: 'target',
+              bookmarkCount: priorityCounts['medium'] || 0,
+              createdAt: '2024-01-05',
+              updatedAt: new Date().toISOString().split('T')[0],
+              isDefault: true
+            },
+            {
+              id: '4',
+              name: 'Low',
+              description: 'Items that can be addressed when time permits',
+              level: 2,
+              color: '#10B981',
+              icon: 'arrow-down',
+              bookmarkCount: priorityCounts['low'] || 0,
+              createdAt: '2024-01-12',
+              updatedAt: new Date().toISOString().split('T')[0],
+              isDefault: true
+            },
+            {
+              id: '5',
+              name: 'Someday',
+              description: 'Items for future reference with no urgency',
+              level: 1,
+              color: '#6B7280',
+              icon: 'clock',
+              bookmarkCount: priorityCounts['someday'] || 0,
+              createdAt: '2024-01-08',
+              updatedAt: new Date().toISOString().split('T')[0],
+              isDefault: true
+            }
+          ];
+
+          // Add any custom priorities found in bookmarks that aren't in defaults
+          const customPriorityNames = Object.keys(priorityCounts).filter(
+            priority => !['critical', 'high', 'medium', 'low', 'someday'].includes(priority)
+          );
+
+          const customPriorities: Priority[] = customPriorityNames.map((priorityName, index) => ({
+            id: `custom-${index + 1}`,
+            name: priorityName.charAt(0).toUpperCase() + priorityName.slice(1),
+            description: `Custom priority level with ${priorityCounts[priorityName]} bookmark${priorityCounts[priorityName] === 1 ? '' : 's'}`,
+            level: 3, // Default to medium level
+            color: ['#8B5CF6', '#EC4899', '#14B8A6', '#F59E0B', '#84CC16'][index % 5],
+            icon: ['zap', 'star', 'target', 'clock', 'arrow-up'][index % 5],
+            bookmarkCount: priorityCounts[priorityName],
+            createdAt: new Date().toISOString().split('T')[0],
+            updatedAt: new Date().toISOString().split('T')[0],
+            isDefault: false
+          }));
+
+          const allPriorities = [...defaultPriorities, ...customPriorities];
+          setPriorities(allPriorities);
+        } else {
+          console.warn('No bookmark data available, showing default priorities with zero counts');
+          // Show default priorities with zero counts
+          const defaultPriorities: Priority[] = [
+            {
+              id: '1', name: 'Critical', description: 'Highest priority items that need immediate attention',
+              level: 5, color: '#EF4444', icon: 'alert-circle', bookmarkCount: 0,
+              createdAt: '2024-01-15', updatedAt: new Date().toISOString().split('T')[0], isDefault: true
+            },
+            {
+              id: '2', name: 'High', description: 'Important items that should be addressed soon',
+              level: 4, color: '#F97316', icon: 'arrow-up', bookmarkCount: 0,
+              createdAt: '2024-01-10', updatedAt: new Date().toISOString().split('T')[0], isDefault: true
+            },
+            {
+              id: '3', name: 'Medium', description: 'Standard priority for regular items',
+              level: 3, color: '#3B82F6', icon: 'target', bookmarkCount: 0,
+              createdAt: '2024-01-05', updatedAt: new Date().toISOString().split('T')[0], isDefault: true
+            },
+            {
+              id: '4', name: 'Low', description: 'Items that can be addressed when time permits',
+              level: 2, color: '#10B981', icon: 'arrow-down', bookmarkCount: 0,
+              createdAt: '2024-01-12', updatedAt: new Date().toISOString().split('T')[0], isDefault: true
+            },
+            {
+              id: '5', name: 'Someday', description: 'Items for future reference with no urgency',
+              level: 1, color: '#6B7280', icon: 'clock', bookmarkCount: 0,
+              createdAt: '2024-01-08', updatedAt: new Date().toISOString().split('T')[0], isDefault: true
+            }
+          ];
+          setPriorities(defaultPriorities);
+        }
+      } catch (error) {
+        console.error('Error loading real priority data:', error);
+        setPriorities([]);
       }
-    ]
-    setPriorities(samplePriorities)
+    };
+
+    loadRealPriorityData();
   }, [])
 
   const filteredPriorities = priorities.filter(priority => {

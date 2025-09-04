@@ -2,6 +2,8 @@
 export { MediaHub } from './components/MediaHub';
 export { MediaLibrary } from './components/MediaLibrary';
 export { RichTextEditor } from './components/RichTextEditor';
+export { SimpleDocumentEditor } from './components/SimpleDocumentEditor';
+export { NovelEditor } from './components/NovelEditor';
 export { DocumentEditor } from './components/DocumentEditor';
 
 // Hooks

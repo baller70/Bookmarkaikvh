@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -25,6 +26,7 @@ import {
 } from 'lucide-react'
 import { NotificationSettings, NotificationType, NotificationFrequency, DeliveryMethod } from '../types'
 import { useNotifications } from '../hooks/useNotifications'
+import { NotificationCalendar } from './NotificationCalendar'
 
 interface NotificationSchedulerProps {
   bookmarkId: string
@@ -46,6 +48,7 @@ export const NotificationScheduler: React.FC<NotificationSchedulerProps> = ({
 
   const [isCreating, setIsCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [formData, setFormData] = useState({
     title: '',
     message: '',
@@ -53,6 +56,7 @@ export const NotificationScheduler: React.FC<NotificationSchedulerProps> = ({
     frequency: 'once' as NotificationFrequency,
     deliveryMethods: ['in-app'] as DeliveryMethod[],
     scheduledTime: '',
+    duration: 30, // Default 30 minutes for tasks
     recurringInterval: 1,
     recurringUnit: 'days' as 'minutes' | 'hours' | 'days' | 'weeks' | 'months',
     teamMembers: [] as string[]
@@ -64,13 +68,14 @@ export const NotificationScheduler: React.FC<NotificationSchedulerProps> = ({
     try {
       const notificationData: Omit<NotificationSettings, 'id' | 'createdAt' | 'updatedAt'> = {
         bookmarkId,
-        userId: 'current-user', // TODO: Get from auth context
+        userId: 'test-user-123',
         title: formData.title,
         message: formData.message,
         type: formData.type,
         frequency: formData.frequency,
         deliveryMethods: formData.deliveryMethods,
         scheduledTime: formData.scheduledTime ? new Date(formData.scheduledTime) : undefined,
+        duration: formData.type === 'task' ? formData.duration : undefined,
         recurringPattern: formData.frequency !== 'once' ? {
           interval: formData.recurringInterval,
           unit: formData.recurringUnit
@@ -82,8 +87,12 @@ export const NotificationScheduler: React.FC<NotificationSchedulerProps> = ({
       if (editingId) {
         await updateNotification(editingId, notificationData)
         setEditingId(null)
+        toast.success(`${formData.type === 'task' ? 'Task' : 'Reminder'} updated successfully!`)
       } else {
         await createNotification(notificationData)
+        const typeLabel = formData.type === 'task' ? 'Task' : 'Reminder'
+        const durationInfo = formData.type === 'task' && formData.duration ? ` (${formData.duration}min)` : ''
+        toast.success(`${typeLabel} created successfully!${durationInfo} Delivery: ${formData.deliveryMethods.join(', ')}`)
       }
       
       // Reset form
@@ -94,6 +103,7 @@ export const NotificationScheduler: React.FC<NotificationSchedulerProps> = ({
         frequency: 'once',
         deliveryMethods: ['in-app'],
         scheduledTime: '',
+        duration: 30,
         recurringInterval: 1,
         recurringUnit: 'days',
         teamMembers: []
@@ -101,6 +111,7 @@ export const NotificationScheduler: React.FC<NotificationSchedulerProps> = ({
       setIsCreating(false)
     } catch (error) {
       console.error('Failed to save notification:', error)
+      toast.error('Failed to create reminder. Please try again.')
     }
   }
 
@@ -141,12 +152,31 @@ export const NotificationScheduler: React.FC<NotificationSchedulerProps> = ({
   const getTypeColor = (type: NotificationType) => {
     switch (type) {
       case 'reminder': return 'bg-blue-100 text-blue-800'
+      case 'task': return 'bg-emerald-100 text-emerald-800'
       case 'content_change': return 'bg-green-100 text-green-800'
       case 'deadline': return 'bg-red-100 text-red-800'
       case 'milestone': return 'bg-purple-100 text-purple-800'
       case 'team_update': return 'bg-orange-100 text-orange-800'
       default: return 'bg-gray-100 text-gray-800'
     }
+  }
+
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date)
+  }
+
+  const handleCreateReminderFromCalendar = (date: Date) => {
+    // Set the scheduled time to the selected date at current time
+    const scheduledDateTime = new Date(date)
+    scheduledDateTime.setHours(new Date().getHours())
+    scheduledDateTime.setMinutes(new Date().getMinutes())
+    
+    setFormData(prev => ({
+      ...prev,
+      scheduledTime: scheduledDateTime.toISOString().slice(0, 16)
+    }))
+    setSelectedDate(date)
+    setIsCreating(true)
   }
 
   return (
@@ -164,7 +194,17 @@ export const NotificationScheduler: React.FC<NotificationSchedulerProps> = ({
           <Plus className="h-4 w-4" />
           NEW REMINDER
         </Button>
-      </div>      {/* Create/Edit Form */}
+      </div>
+
+      {/* Calendar View */}
+      <NotificationCalendar
+        notifications={notifications}
+        onDateSelect={handleDateSelect}
+        onCreateReminder={handleCreateReminderFromCalendar}
+        selectedDate={selectedDate}
+      />
+
+      {/* Create/Edit Form */}
       {isCreating && (
         <Card>
           <CardHeader>
@@ -197,6 +237,7 @@ export const NotificationScheduler: React.FC<NotificationSchedulerProps> = ({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="reminder">Reminder</SelectItem>
+                      <SelectItem value="task">Task</SelectItem>
                       <SelectItem value="content_change">Content Change</SelectItem>
                       <SelectItem value="deadline">Deadline</SelectItem>
                       <SelectItem value="milestone">Milestone</SelectItem>
@@ -217,6 +258,62 @@ export const NotificationScheduler: React.FC<NotificationSchedulerProps> = ({
                   required
                 />
               </div>
+
+              {/* Task Duration - only show for task type */}
+              {formData.type === 'task' && (
+                <div>
+                  <Label htmlFor="duration">TASK DURATION</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="duration"
+                      type="number"
+                      min="5"
+                      max="480"
+                      step="5"
+                      value={formData.duration}
+                      onChange={(e) => setFormData(prev => ({ ...prev, duration: parseInt(e.target.value) || 30 }))}
+                      placeholder="30"
+                      className="w-24"
+                    />
+                    <span className="text-sm text-gray-600">minutes</span>
+                    <div className="flex gap-1 ml-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFormData(prev => ({ ...prev, duration: 15 }))}
+                      >
+                        15m
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFormData(prev => ({ ...prev, duration: 30 }))}
+                      >
+                        30m
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFormData(prev => ({ ...prev, duration: 60 }))}
+                      >
+                        1h
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFormData(prev => ({ ...prev, duration: 120 }))}
+                      >
+                        2h
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">How long will this task take to complete?</p>
+                </div>
+              )}
 
               {/* Frequency Settings */}
               <div>
@@ -357,7 +454,18 @@ export const NotificationScheduler: React.FC<NotificationSchedulerProps> = ({
                       {notification.scheduledTime && (
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {notification.scheduledTime.toLocaleDateString()} {notification.scheduledTime.toLocaleTimeString()}
+                          {new Date(notification.scheduledTime).toLocaleDateString()} {new Date(notification.scheduledTime).toLocaleTimeString()}
+                        </div>
+                      )}
+                      {notification.type === 'task' && notification.duration && (
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          <span className="font-medium text-emerald-600">
+                            {notification.duration < 60 
+                              ? `${notification.duration}m` 
+                              : `${Math.floor(notification.duration / 60)}h ${notification.duration % 60 > 0 ? `${notification.duration % 60}m` : ''}`
+                            }
+                          </span>
                         </div>
                       )}
                       <div className="flex items-center gap-1">

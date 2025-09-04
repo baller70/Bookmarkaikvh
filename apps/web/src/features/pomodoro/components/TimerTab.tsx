@@ -35,11 +35,11 @@ const TAB_CONFIG: PomodoroTabConfig[] = [
   { id: 'SETTINGS', label: 'SETTINGS', icon: 'Settings' }
 ];
 
-export default function TimerTab() {
+export default function TimerTab({ bookmarkId }: { bookmarkId?: string }) {
   const [activeTab, setActiveTab] = useState<PomodoroTab>('TIMER');
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const pomodoroHook = usePomodoro();
-  const { timer, tasks } = pomodoroHook;
+  const pomodoroHook = usePomodoro({ bookmarkId });
+  const { timer, tasks, currentTask } = pomodoroHook;
 
   const getTabBadge = (tabId: PomodoroTab): number | undefined => {
     switch (tabId) {
@@ -94,7 +94,7 @@ export default function TimerTab() {
 
     switch (activeTab) {
       case 'TIMER':
-        return <PomodoroTimer {...extendedProps} />;
+        return <PomodoroTimer {...extendedProps} taskLists={pomodoroHook.taskLists} getTasksForList={pomodoroHook.getTasksForList} />;
       case 'TASKS':
         return <TaskManager {...extendedProps} />;
       case 'LISTS':
@@ -174,6 +174,17 @@ export default function TimerTab() {
                    timer.type === 'shortBreak' ? 'SHORT BREAK' : 'LONG BREAK'}
                 </span>
               </div>
+              
+              {/* Current Task Title in Sidebar */}
+              {timer.type === 'work' && currentTask && (
+                <div className="mb-2">
+                  <div className="text-xs text-gray-400 uppercase tracking-wide">CURRENT TASK</div>
+                  <div className="text-sm font-medium text-gray-700 truncate">
+                    {currentTask.title}
+                  </div>
+                </div>
+              )}
+              
               <div className="text-2xl font-bold text-gray-900 mb-2">
                 {Math.floor(timer.remainingTime / 60).toString().padStart(2, '0')}:
                 {(timer.remainingTime % 60).toString().padStart(2, '0')}
