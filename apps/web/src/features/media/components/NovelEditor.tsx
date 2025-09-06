@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './novel-editor.css';
 import {
   EditorRoot,
@@ -47,6 +47,7 @@ export function NovelEditor({
   mediaFiles = []
 }: NovelEditorProps) {
   const [editorContent, setEditorContent] = useState<JSONContent | null>(null);
+  const editorRef = useRef<EditorInstance | null>(null);
 
   // Define base suggestion items for slash commands
   const baseSuggestionItems: SuggestionItem[] = [
@@ -469,6 +470,7 @@ export function NovelEditor({
           initialContent={editorContent}
           extensions={defaultExtensions}
           onUpdate={({ editor }: { editor: EditorInstance }) => {
+            editorRef.current = editor;
             const json = editor.getJSON();
             if (json) {
               handleEditorChange(json);
@@ -487,7 +489,33 @@ export function NovelEditor({
           <EditorCommand className="z-50 h-auto max-h-[330px] overflow-y-auto rounded-md border border-gray-200 bg-white px-1 py-2 shadow-md" shouldFilter={false}>
             <EditorCommandEmpty className="px-2 text-gray-500">No results</EditorCommandEmpty>
             <EditorCommandList>
-              {/* Items are injected by Novel's renderItems() */}
+              {rawSuggestionItems.map((item, index) => (
+                <EditorCommandItem
+                  key={`${item.title}-${index}`}
+                  onCommand={(val) => {
+                    console.log('🔍 Command triggered:', item.title);
+                    // Get current editor instance and range
+                    const editor = editorRef.current;
+                    if (editor && item.command) {
+                      // Create a mock range - this might need adjustment based on actual cursor position
+                      const { from, to } = editor.state.selection;
+                      const range = { from, to };
+                      item.command({ editor, range });
+                    }
+                  }}
+                  className="flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-gray-100 aria-selected:bg-gray-100"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-sm border border-gray-200 bg-white">
+                      {item.icon}
+                    </div>
+                    <div>
+                      <p className="font-medium">{item.title}</p>
+                      <p className="text-xs text-gray-500">{item.description}</p>
+                    </div>
+                  </div>
+                </EditorCommandItem>
+              ))}
             </EditorCommandList>
           </EditorCommand>
         </EditorContent>

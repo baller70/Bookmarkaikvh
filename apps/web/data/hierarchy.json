@@ -1,194 +1,58 @@
 [
   {
-    "folderId": "Community Engagement",
+    "folderId": "E-commerce",
     "level": "collaborators",
     "order": 0,
     "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
+    "createdAt": "2025-09-05T15:51:21.157Z",
+    "updatedAt": "2025-09-05T15:51:21.157Z"
   },
   {
-    "folderId": "Basketball Training",
+    "folderId": "Business",
     "level": "collaborators",
     "order": 0,
     "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
+    "createdAt": "2025-09-05T15:51:21.157Z",
+    "updatedAt": "2025-09-05T15:51:21.157Z"
   },
   {
-    "folderId": "Gaming",
+    "folderId": "Technology",
     "level": "collaborators",
     "order": 0,
     "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
+    "createdAt": "2025-09-05T15:51:21.157Z",
+    "updatedAt": "2025-09-05T15:51:21.157Z"
   },
   {
-    "folderId": "llm models",
+    "folderId": "Development",
     "level": "collaborators",
     "order": 0,
     "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
+    "createdAt": "2025-09-05T15:51:21.157Z",
+    "updatedAt": "2025-09-05T15:51:21.157Z"
   },
   {
-    "folderId": "planning",
+    "folderId": "technology",
     "level": "collaborators",
     "order": 0,
     "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
+    "createdAt": "2025-09-05T15:51:21.157Z",
+    "updatedAt": "2025-09-05T15:51:21.157Z"
   },
   {
-    "folderId": "automation",
+    "folderId": "Testing",
     "level": "collaborators",
     "order": 0,
     "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "wordpress",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "ai tools",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "ebooks/audiobook",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "video production",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
+    "createdAt": "2025-09-05T15:51:21.157Z",
+    "updatedAt": "2025-09-05T15:51:21.157Z"
   },
   {
     "folderId": "General",
     "level": "collaborators",
     "order": 0,
     "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "social media",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "blog",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "marketing",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "email management",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "communication",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "ecommerce",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "Tools",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "voice support",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "editing tools",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "finance",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "thos bills",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "web management",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
-  },
-  {
-    "folderId": "home management",
-    "level": "collaborators",
-    "order": 0,
-    "user_id": "dev-user-123",
-    "createdAt": "2025-07-11T20:31:09.598Z",
-    "updatedAt": "2025-07-11T20:31:09.598Z"
+    "createdAt": "2025-09-05T15:51:21.157Z",
+    "updatedAt": "2025-09-05T15:51:21.157Z"
   }
 ]

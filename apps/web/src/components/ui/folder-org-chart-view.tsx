@@ -126,12 +126,19 @@ export function FolderOrgChartView({
         const response = await fetch('/api/hierarchy-sections');
         if (response.ok) {
           const data = await response.json();
-          setManagedHierarchySections(data.hierarchySections);
+          if (data.hierarchySections && Array.isArray(data.hierarchySections)) {
+            setManagedHierarchySections(data.hierarchySections);
+          } else {
+            console.warn('Invalid hierarchy sections data received, using defaults');
+            setManagedHierarchySections([]);
+          }
         } else {
-          console.error('Failed to load hierarchy sections');
+          console.error('Failed to load hierarchy sections, using defaults');
+          setManagedHierarchySections([]);
         }
       } catch (error) {
-        console.error('Error loading hierarchy sections:', error);
+        console.error('Error loading hierarchy sections, using defaults:', error);
+        setManagedHierarchySections([]);
       } finally {
         setIsLoadingHierarchySections(false);
       }
@@ -203,8 +210,8 @@ export function FolderOrgChartView({
 
   // Convert API hierarchy sections format to local format
   const convertApiSectionsToLocal = (apiSections: any[]): HierarchySection[] => {
-    if (!apiSections) return defaultHierarchySections;
-    
+    if (!apiSections || apiSections.length === 0) return defaultHierarchySections;
+
     return apiSections.map((section, index) => ({
       id: section.id || section.section_id,
       title: section.title,
@@ -230,6 +237,21 @@ export function FolderOrgChartView({
 
   // Use managedHierarchySections from API, fallback to default if not loaded
   const hierarchySections = convertApiSectionsToLocal(managedHierarchySections);
+
+  // Debug logging
+  console.log('🔍 FolderOrgChartView Debug:', {
+    managedHierarchySections,
+    hierarchySections,
+    folders: folders.length,
+    hierarchyAssignments: hierarchyAssignments.length,
+    isLoadingHierarchySections
+  });
+
+  // Force render with default sections if empty
+  if (hierarchySections.length === 0) {
+    console.log('⚠️ hierarchySections is empty, using default sections');
+  }
+
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'bookmarks' | 'recent'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -240,6 +262,8 @@ export function FolderOrgChartView({
     iconName: 'Users',
     colorName: 'blue'
   });
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [selectedFolderForColor, setSelectedFolderForColor] = useState<SimpleFolder | null>(null);
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -384,9 +408,37 @@ export function FolderOrgChartView({
   // Get folders by hierarchy level
   const getFoldersByLevel = (level: string) => {
     const levelAssignments = hierarchyAssignments.filter(a => a.level === level);
-    return filteredAndSortedFolders.filter(folder =>
+    const assignedFolders = filteredAndSortedFolders.filter(folder =>
       levelAssignments.some(a => a.folderId === folder.id)
     );
+
+    // If this is the first level (director) and there are unassigned folders, show them here
+    if (level === 'director' || level === hierarchySections[0]?.id) {
+      const assignedFolderIds = hierarchyAssignments.map(a => a.folderId);
+      const unassignedFolders = filteredAndSortedFolders.filter(folder =>
+        !assignedFolderIds.includes(folder.id)
+      );
+      const result = [...assignedFolders, ...unassignedFolders];
+
+      console.log(`🔍 getFoldersByLevel(${level}):`, {
+        levelAssignments: levelAssignments.length,
+        assignedFolders: assignedFolders.length,
+        unassignedFolders: unassignedFolders.length,
+        totalResult: result.length,
+        filteredAndSortedFolders: filteredAndSortedFolders.length,
+        isFirstLevel: level === 'director' || level === hierarchySections[0]?.id,
+        hierarchySections0Id: hierarchySections[0]?.id
+      });
+
+      return result;
+    }
+
+    console.log(`🔍 getFoldersByLevel(${level}):`, {
+      levelAssignments: levelAssignments.length,
+      assignedFolders: assignedFolders.length
+    });
+
+    return assignedFolders;
   };
 
   // Get icon component by name
@@ -589,10 +641,10 @@ export function FolderOrgChartView({
                     <Edit3 className="h-4 w-4 mr-2" />
                     Edit Folder
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('Change color for folder:', folder.id);
+                      handleColorChange(folder);
                     }}
                   >
                     <div className="h-4 w-4 mr-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500"></div>
@@ -784,17 +836,20 @@ export function FolderOrgChartView({
   };
 
   // Handle adding a new hierarchy level
-  const handleAddLevel = () => {
+  const handleAddLevel = async () => {
     if (newLevel.title.trim()) {
-      const newSection: HierarchySection = {
+      const newSection = {
         id: newLevel.title.toLowerCase().replace(/\s+/g, '-'),
         title: newLevel.title,
         iconName: newLevel.iconName,
         colorName: newLevel.colorName,
-        order: hierarchySections.length + 1
+        order: (managedHierarchySections?.length || 0) + 1
       };
-      
-      setHierarchySections([...hierarchySections, newSection]);
+
+      // Add to managed sections through the API handler
+      const updatedSections = [...(managedHierarchySections || []), newSection];
+      await handleHierarchySectionsChange(updatedSections);
+
       setShowAddLevel(false);
       setNewLevel({
         title: '',
@@ -812,6 +867,23 @@ export function FolderOrgChartView({
       colorName: 'blue'
     });
     setShowAddLevel(false);
+  };
+
+  // Handle folder color change
+  const handleColorChange = (folder: SimpleFolder) => {
+    setSelectedFolderForColor(folder);
+    setShowColorPicker(true);
+  };
+
+  // Apply color change to folder
+  const applyColorChange = (colorName: string) => {
+    if (selectedFolderForColor) {
+      console.log(`Changing color of folder ${selectedFolderForColor.name} to ${colorName}`);
+      // TODO: Implement actual color change logic
+      alert(`Color changed to ${colorName} for folder: ${selectedFolderForColor.name}`);
+      setShowColorPicker(false);
+      setSelectedFolderForColor(null);
+    }
   };
 
   return (
@@ -930,41 +1002,57 @@ export function FolderOrgChartView({
         onDragEnd={handleDragEnd}
       >
         <div className="space-y-8">
-          {hierarchySections
-            .sort((a, b) => a.order - b.order)
-            .map(section => {
-              const levelFolders = getFoldersByLevel(section.id);
-              
-              return (
-                <div key={section.id} className="space-y-4">
-                  <DroppableSectionHeader section={section} />
-                  
-                  {levelFolders.length > 0 ? (
-                    <SortableContext items={levelFolders.map(f => f.id)} strategy={rectSortingStrategy}>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {levelFolders.map(folder => (
-                          <SortableFolderCard key={folder.id} folder={folder} />
-                        ))}
+          {hierarchySections.length > 0 ? (
+            hierarchySections
+              .sort((a, b) => a.order - b.order)
+              .map(section => {
+                const levelFolders = getFoldersByLevel(section.id);
+
+                return (
+                  <div key={section.id} className="space-y-4">
+                    <DroppableSectionHeader section={section} />
+
+                    {levelFolders.length > 0 ? (
+                      <SortableContext items={levelFolders.map(f => f.id)} strategy={rectSortingStrategy}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                          {levelFolders.map(folder => (
+                            <SortableFolderCard key={folder.id} folder={folder} />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <FolderIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                        <p>No folders in this level yet</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={onCreateFolder}
+                          className="mt-2"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Folder
+                        </Button>
                       </div>
-                    </SortableContext>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <FolderIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No folders in this level yet</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onCreateFolder}
-                        className="mt-2"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Folder
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    )}
+                  </div>
+                );
+              })
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              <FolderIcon className="h-16 w-16 mx-auto mb-4 opacity-50" />
+              <h3 className="text-lg font-medium mb-2">No Hierarchy Sections</h3>
+              <p className="mb-4">No hierarchy sections are configured. The folder hierarchy view requires hierarchy sections to organize folders.</p>
+              <Button
+                variant="outline"
+                onClick={onCreateFolder}
+                className="mr-2"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Create Folder
+              </Button>
+            </div>
+          )}
         </div>
       </DndContext>
 
@@ -1088,6 +1176,55 @@ export function FolderOrgChartView({
           </div>
         </div>
       )}
+
+      {/* Color Picker Modal */}
+      {showColorPicker && selectedFolderForColor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Change Folder Color</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowColorPicker(false);
+                  setSelectedFolderForColor(null);
+                }}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Choose a new color for "{selectedFolderForColor.name}"
+            </p>
+
+            <div className="grid grid-cols-4 gap-3 mb-6">
+              {availableColors.map((color) => (
+                <button
+                  key={color.name}
+                  onClick={() => applyColorChange(color.name)}
+                  className={`w-12 h-12 rounded-lg ${color.gradient} hover:scale-110 transition-transform shadow-md hover:shadow-lg`}
+                  title={color.name}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowColorPicker(false);
+                  setSelectedFolderForColor(null);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+}

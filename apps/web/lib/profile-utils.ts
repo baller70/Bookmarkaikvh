@@ -22,11 +22,7 @@ export const getProfilePicture = (): string => {
         return settings.profile.avatar;
       }
     } catch (error) {
-      appLogger.warn('Error loading profile avatar from settings', error);
-      Sentry.captureException(error, {
-        tags: { component: 'profile-utils', action: 'get_profile_picture' },
-        level: 'warning'
-      });
+      console.warn('Error loading profile avatar from settings', error);
     }
   }
 
@@ -71,9 +67,7 @@ export const onProfilePictureChange = (callback: (newPicture: string) => void) =
   if (typeof window === 'undefined') return () => {};
 
   const handleStorageChange = (e: StorageEvent) => {
-    if (e.key === 'dna_profile_avatar' && e.newValue) {
-      callback(e.newValue);
-    } else if (e.key === 'userSettings' && e.newValue) {
+    if (e.key === 'userSettings' && e.newValue) {
       try {
         const settings = JSON.parse(e.newValue);
         if (settings.profile?.avatar) {

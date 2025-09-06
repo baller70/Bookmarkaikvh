@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import type { BookmarkWithRelations } from './FolderCard';
 import type { Folder as FolderType } from './FolderFormDialog';
+import { getFaviconUrl, handleFaviconError, getDomainFromUrl } from '@/lib/favicon-utils';
 import { 
   DndContext, 
   closestCenter, 
@@ -232,18 +233,7 @@ function BookmarkAssignmentDialog({
     return boards.find(board => board.bookmarkIds.includes(bookmarkId));
   };
 
-  const getDomainFromUrl = (url: string) => {
-    try {
-      return new URL(url).hostname.replace('www.', '');
-    } catch {
-      return url;
-    }
-  };
-
-  const getFaviconUrl = (url: string) => {
-    const domain = getDomainFromUrl(url);
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-  };
+  // Utility functions are now imported from favicon-utils
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -272,14 +262,11 @@ function BookmarkAssignmentDialog({
                 <div key={bookmark.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                     <div className="w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded">
-                      <img 
-                        src={getFaviconUrl(bookmark.url)} 
+                      <img
+                        src={getFaviconUrl(bookmark, 32)}
                         alt=""
                         className="w-5 h-5"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                        }}
+                        onError={(e) => handleFaviconError(e, bookmark, e.currentTarget.nextElementSibling as HTMLElement)}
                       />
                       <Globe className="w-4 h-4 text-gray-500 hidden" />
                     </div>
@@ -332,19 +319,17 @@ function BookmarkAssignmentDialog({
 }
 
 // Sortable Board Component
-function SortableKanbanBoard({ 
-  board, 
-  bookmarks, 
-  onBookmarkClick, 
+function SortableKanbanBoard({
+  board,
+  bookmarks,
+  onBookmarkClick,
   onDeleteBoard,
-  getFaviconUrl,
-  formatDate 
+  formatDate
 }: {
   board: KanbanBoard;
   bookmarks: BookmarkWithRelations[];
   onBookmarkClick?: (bookmark: BookmarkWithRelations) => void;
   onDeleteBoard: (boardId: string) => void;
-  getFaviconUrl: (url: string) => string;
   formatDate: (date: string | null) => string;
 }) {
   const {
@@ -420,7 +405,6 @@ function SortableKanbanBoard({
                 key={bookmark.id}
                 bookmark={bookmark}
                 onBookmarkClick={onBookmarkClick}
-                getFaviconUrl={getFaviconUrl}
                 formatDate={formatDate}
               />
             ))}
@@ -432,15 +416,13 @@ function SortableKanbanBoard({
 }
 
 // Sortable Bookmark Component
-function SortableKanbanBookmark({ 
-  bookmark, 
-  onBookmarkClick, 
-  getFaviconUrl, 
-  formatDate 
+function SortableKanbanBookmark({
+  bookmark,
+  onBookmarkClick,
+  formatDate
 }: {
   bookmark: BookmarkWithRelations;
   onBookmarkClick?: (bookmark: BookmarkWithRelations) => void;
-  getFaviconUrl: (url: string) => string;
   formatDate: (date: string | null) => string;
 }) {
   const {
@@ -479,12 +461,10 @@ function SortableKanbanBookmark({
               </div>
             </div>
             <img
-              src={getFaviconUrl(bookmark.url)}
+              src={getFaviconUrl(bookmark, 16)}
               alt=""
               className="w-4 h-4 mt-0.5 flex-shrink-0"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = '/favicon.ico';
-              }}
+              onError={(e) => handleFaviconError(e, bookmark)}
             />
             <div className="flex-1 min-w-0" onClick={() => onBookmarkClick?.(bookmark)}>
               <h4 className="text-sm font-medium text-gray-900 truncate">
@@ -743,18 +723,8 @@ export function KanbanView({
     return 'Organize your bookmarks across custom boards for better workflow management';
   };
 
-  const getDomainFromUrl = (url: string) => {
-    try {
-      return new URL(url).hostname.replace('www.', '');
-    } catch {
-      return url;
-    }
-  };
-
-  const getFaviconUrl = (url: string) => {
-    const domain = getDomainFromUrl(url);
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-  };
+  // Use the utility functions from favicon-utils
+  // getDomainFromUrl and getFaviconUrl are now imported
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '';
@@ -867,7 +837,6 @@ export function KanbanView({
                   bookmarks={boardBookmarks}
                   onBookmarkClick={onBookmarkClick}
                   onDeleteBoard={handleDeleteBoard}
-                  getFaviconUrl={getFaviconUrl}
                   formatDate={formatDate}
                 />
               );
@@ -913,14 +882,11 @@ export function KanbanView({
               <Card key={bookmark.id} className="p-3 bg-orange-50/50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded">
-                    <img 
-                      src={getFaviconUrl(bookmark.url)} 
+                    <img
+                      src={getFaviconUrl(bookmark, 32)}
                       alt=""
                       className="w-5 h-5"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                      }}
+                      onError={(e) => handleFaviconError(e, bookmark, e.currentTarget.nextElementSibling as HTMLElement)}
                     />
                     <Globe className="w-4 h-4 text-gray-500 hidden" />
                   </div>

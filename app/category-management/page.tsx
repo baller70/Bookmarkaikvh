@@ -242,7 +242,7 @@ export default function CategoryManagementPage() {
         body: JSON.stringify({
           ...formData,
           user_id: 'dev-user-123',
-          parent_id: formData.parent_id || null
+          parent_id: formData.parent_id && formData.parent_id !== 'none' ? formData.parent_id : null
         })
       });
 
@@ -521,7 +521,7 @@ export default function CategoryManagementPage() {
                     <SelectValue placeholder="Select parent category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None (Root Category)</SelectItem>
+                    <SelectItem value="none">None (Root Category)</SelectItem>
                     {categories.map(category => (
                       <SelectItem key={category.id} value={category.id}>
                         {category.name}
@@ -801,7 +801,7 @@ export default function CategoryManagementPage() {
                   <SelectValue placeholder="Select parent category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None (Root Category)</SelectItem>
+                  <SelectItem value="none">None (Root Category)</SelectItem>
                   {categories
                     .filter(cat => cat.id !== selectedCategory?.id)
                     .map(category => (

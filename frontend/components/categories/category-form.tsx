@@ -239,7 +239,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({
                   <SelectValue placeholder="Select parent category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None (Root Category)</SelectItem>
+                  <SelectItem value="none">None (Root Category)</SelectItem>
                   {availableParentCategories.map(category => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}

@@ -6,13 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Upload, 
-  Search, 
-  Grid, 
-  List, 
-  Filter, 
-  FolderPlus, 
+import {
+  Upload,
+  Search,
+  Grid,
+  List,
+  Filter,
+  FolderPlus,
   FileText,
   Image,
   Video,
@@ -26,7 +26,13 @@ import {
   Eye,
   Share2,
   ArrowLeft,
-  ChevronRight
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  ChevronLeft,
+  X,
+  Maximize2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -50,9 +56,16 @@ import { toast } from 'sonner';
 interface MediaLibraryProps {
   onDocumentOpen?: (documentId: string) => void;
   initialFilterType?: 'image' | 'video' | 'audio' | 'document';
+  showCreateDocumentButton?: boolean;
+  onCreateDocument?: () => void;
 }
 
-export function MediaLibrary({ onDocumentOpen, initialFilterType }: MediaLibraryProps = {}) {
+export function MediaLibrary({
+  onDocumentOpen,
+  initialFilterType,
+  showCreateDocumentButton = false,
+  onCreateDocument
+}: MediaLibraryProps = {}) {
   const {
     filteredFiles,
     filteredFolders,
@@ -84,16 +97,105 @@ export function MediaLibrary({ onDocumentOpen, initialFilterType }: MediaLibrary
   // Preview modal state
   const [previewFile, setPreviewFile] = useState<MediaFile | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const [previewRotation, setPreviewRotation] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   // Preview functions
   const openPreview = (file: MediaFile) => {
     setPreviewFile(file);
     setIsPreviewOpen(true);
+    setPreviewZoom(1);
+    setPreviewRotation(0);
+    setIsFullscreen(false);
   };
-  
+
   const closePreview = () => {
     setPreviewFile(null);
     setIsPreviewOpen(false);
+    setPreviewZoom(1);
+    setPreviewRotation(0);
+    setIsFullscreen(false);
+  };
+
+  const navigatePreview = (direction: 'prev' | 'next') => {
+    if (!previewFile) return;
+
+    const currentIndex = filteredFiles.findIndex(f => f.id === previewFile.id);
+    let newIndex;
+
+    if (direction === 'prev') {
+      newIndex = currentIndex > 0 ? currentIndex - 1 : filteredFiles.length - 1;
+    } else {
+      newIndex = currentIndex < filteredFiles.length - 1 ? currentIndex + 1 : 0;
+    }
+
+    const newFile = filteredFiles[newIndex];
+    if (newFile) {
+      setPreviewFile(newFile);
+      setPreviewZoom(1);
+      setPreviewRotation(0);
+    }
+  };
+
+  const handleZoom = (delta: number) => {
+    setPreviewZoom(prev => Math.max(0.25, Math.min(4, prev + delta)));
+  };
+
+  const handleRotate = () => {
+    setPreviewRotation(prev => (prev + 90) % 360);
+  };
+
+  // Drag and drop handlers for file organization
+  const handleFileDragStart = (e: React.DragEvent, file: MediaFile) => {
+    setDraggedFile(file);
+    setIsDragging(true);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', file.id);
+  };
+
+  const handleFileDragEnd = () => {
+    setDraggedFile(null);
+    setDragOverFolder(null);
+    setIsDragging(false);
+  };
+
+  const handleFolderDragOver = (e: React.DragEvent, folderId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverFolder(folderId);
+  };
+
+  const handleFolderDragLeave = (e: React.DragEvent) => {
+    // Only clear if we're actually leaving the folder (not entering a child element)
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverFolder(null);
+    }
+  };
+
+  const handleFolderDrop = async (e: React.DragEvent, folderId: string) => {
+    e.preventDefault();
+    setDragOverFolder(null);
+    setIsDragging(false);
+
+    if (!draggedFile) return;
+
+    try {
+      // Get the folder name for the success message
+      const targetFolder = filteredFolders.find(f => f.id === folderId);
+      const folderName = targetFolder?.name || 'folder';
+
+      // Move the file to the folder
+      await moveFileToFolder(draggedFile.id, folderId);
+
+      toast.success(`Moved "${draggedFile.name}" to "${folderName}"`);
+
+    } catch (error) {
+      console.error('Error moving file:', error);
+      toast.error('Failed to move file');
+    } finally {
+      setDraggedFile(null);
+    }
   };
   
   const [showCreateFolder, setShowCreateFolder] = useState(false);
@@ -101,6 +203,11 @@ export function MediaLibrary({ onDocumentOpen, initialFilterType }: MediaLibrary
   const [persistentFiles, setPersistentFiles] = useState<any[]>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(true);
   const [isUploadingToPersistent, setIsUploadingToPersistent] = useState(false);
+
+  // Drag and drop state
+  const [draggedFile, setDraggedFile] = useState<MediaFile | null>(null);
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   // Load persistent files on component mount
   useEffect(() => {
     loadPersistentFiles();
@@ -301,6 +408,12 @@ export function MediaLibrary({ onDocumentOpen, initialFilterType }: MediaLibrary
             <FolderPlus className="h-4 w-4 mr-2" />
             New Folder
           </Button>
+          {showCreateDocumentButton && onCreateDocument && (
+            <Button variant="outline" onClick={onCreateDocument}>
+              <FileText className="h-4 w-4 mr-2" />
+              Create Document
+            </Button>
+          )}
 
           {selectedFiles.length > 0 && (
             <Button variant="destructive" onClick={() => deleteFiles(selectedFiles)}>
@@ -399,11 +512,20 @@ export function MediaLibrary({ onDocumentOpen, initialFilterType }: MediaLibrary
       )}
 
       {/* Content Area */}
-      <div 
-        className="flex-1 p-4"
+      <div
+        className={`flex-1 p-4 relative ${isDragging ? 'bg-blue-50/50' : ''}`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
+        {/* Drag overlay */}
+        {isDragging && (
+          <div className="absolute inset-0 bg-blue-100/20 border-2 border-dashed border-blue-300 rounded-lg flex items-center justify-center z-10 pointer-events-none">
+            <div className="text-center">
+              <FolderIcon className="h-12 w-12 mx-auto text-blue-500 mb-2" />
+              <p className="text-blue-700 font-medium">Drop file into a folder to organize</p>
+            </div>
+          </div>
+        )}
 
 
         {filteredFolders.length === 0 && filteredFiles.length === 0 && filteredDocuments.length === 0 ? (
@@ -422,9 +544,9 @@ export function MediaLibrary({ onDocumentOpen, initialFilterType }: MediaLibrary
           <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4' : 'space-y-2'}>
             {/* Folders */}
             {filteredFolders.map((folder) => (
-              <FolderCard 
-                key={folder.id} 
-                folder={folder} 
+              <FolderCard
+                key={folder.id}
+                folder={folder}
                 viewMode={viewMode}
                 onSelect={() => setSelectedFolder(folder.id)}
                 onDelete={(folderId) => {
@@ -436,6 +558,10 @@ export function MediaLibrary({ onDocumentOpen, initialFilterType }: MediaLibrary
                     toast.error('Failed to delete folder');
                   }
                 }}
+                onDragOver={handleFolderDragOver}
+                onDragLeave={handleFolderDragLeave}
+                onDrop={handleFolderDrop}
+                isDragOver={dragOverFolder === folder.id}
               />
             ))}
 
@@ -451,9 +577,9 @@ export function MediaLibrary({ onDocumentOpen, initialFilterType }: MediaLibrary
 
             {/* Files */}
             {filteredFiles.map((file) => (
-              <FileCard 
-                key={file.id} 
-                file={file} 
+              <FileCard
+                key={file.id}
+                file={file}
                 viewMode={viewMode}
                 isSelected={selectedFiles.includes(file.id)}
                 onSelect={() => toggleFileSelection(file.id)}
@@ -467,75 +593,184 @@ export function MediaLibrary({ onDocumentOpen, initialFilterType }: MediaLibrary
                     toast.error('Failed to delete file');
                   }
                 }}
+                onDragStart={handleFileDragStart}
+                onDragEnd={handleFileDragEnd}
+                isDragging={draggedFile?.id === file.id}
               />
             ))}
           </div>
         )}
       </div>
       
-      {/* Preview Modal */}
+      {/* Enhanced Preview Modal */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>{previewFile?.name}</DialogTitle>
-          </DialogHeader>
+        <DialogContent className={`${isFullscreen ? 'max-w-full max-h-full w-screen h-screen' : 'max-w-6xl max-h-[95vh]'} overflow-hidden p-0`}>
           {previewFile && (
-            <div className="flex flex-col items-center justify-center p-4">
-              {previewFile.type === 'image' ? (
-                <img
-                  src={previewFile.url}
-                  alt={previewFile.name}
-                  className="max-w-full max-h-[60vh] object-contain rounded-lg"
-                />
-              ) : previewFile.type === 'video' ? (
-                <video
-                  src={previewFile.url}
-                  controls
-                  className="max-w-full max-h-[60vh] rounded-lg"
-                >
-                  Your browser does not support the video tag.
-                </video>
-              ) : previewFile.type === 'audio' ? (
-                <div className="w-full max-w-md">
-                  <div className="text-center mb-4">
-                    <Music className="h-16 w-16 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-600">{previewFile.name}</p>
-                  </div>
-                  <audio
-                    src={previewFile.url}
-                    controls
-                    className="w-full"
-                  >
-                    Your browser does not support the audio tag.
-                  </audio>
+            <div className="flex flex-col h-full">
+              {/* Header with controls */}
+              <div className="flex items-center justify-between p-4 border-b bg-white">
+                <div className="flex items-center space-x-2">
+                  <h3 className="font-medium text-lg truncate max-w-md">{previewFile.name}</h3>
+                  <Badge variant="secondary" className="text-xs">
+                    {previewFile.type.toUpperCase()}
+                  </Badge>
                 </div>
-              ) : (
-                <div className="text-center">
-                  <FileIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-                  <p className="text-sm text-gray-600 mb-4">
-                    Preview not available for this file type
-                  </p>
-                  <Button onClick={() => window.open(previewFile.url, '_blank')}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download File
+
+                <div className="flex items-center space-x-2">
+                  {/* Navigation buttons */}
+                  {filteredFiles.length > 1 && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigatePreview('prev')}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm text-gray-500">
+                        {filteredFiles.findIndex(f => f.id === previewFile.id) + 1} / {filteredFiles.length}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigatePreview('next')}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+
+                  {/* Image controls */}
+                  {previewFile.type === 'image' && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleZoom(-0.25)}
+                        className="h-8 w-8 p-0"
+                        disabled={previewZoom <= 0.25}
+                      >
+                        <ZoomOut className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm text-gray-500 min-w-[3rem] text-center">
+                        {Math.round(previewZoom * 100)}%
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleZoom(0.25)}
+                        className="h-8 w-8 p-0"
+                        disabled={previewZoom >= 4}
+                      >
+                        <ZoomIn className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRotate}
+                        className="h-8 w-8 p-0"
+                      >
+                        <RotateCw className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsFullscreen(!isFullscreen)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={closePreview}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
-              )}
-              
-              {/* File Details */}
-              <div className="mt-4 text-sm text-gray-600 text-center">
-                <p>Size: {formatFileSize(previewFile.size)}</p>
-                <p>Type: {previewFile.mimeType}</p>
-                <p>Uploaded: {formatDate(previewFile.uploadedAt)}</p>
-                {previewFile.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2 justify-center">
-                    {previewFile.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
+              </div>
+
+              {/* Content area */}
+              <div className="flex-1 flex items-center justify-center p-4 bg-gray-50 overflow-hidden">
+                {previewFile.type === 'image' ? (
+                  <div className="relative overflow-auto max-w-full max-h-full">
+                    <img
+                      src={previewFile.url}
+                      alt={previewFile.name}
+                      className="max-w-none transition-transform duration-200"
+                      style={{
+                        transform: `scale(${previewZoom}) rotate(${previewRotation}deg)`,
+                        maxHeight: isFullscreen ? '90vh' : '60vh',
+                        maxWidth: isFullscreen ? '90vw' : '100%',
+                        objectFit: 'contain'
+                      }}
+                    />
+                  </div>
+                ) : previewFile.type === 'video' ? (
+                  <video
+                    src={previewFile.url}
+                    controls
+                    className="max-w-full max-h-full rounded-lg"
+                    style={{
+                      maxHeight: isFullscreen ? '90vh' : '60vh',
+                      maxWidth: isFullscreen ? '90vw' : '100%'
+                    }}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                ) : previewFile.type === 'audio' ? (
+                  <div className="w-full max-w-md bg-white rounded-lg p-6">
+                    <div className="text-center mb-4">
+                      <Music className="h-16 w-16 mx-auto text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">{previewFile.name}</p>
+                    </div>
+                    <audio
+                      src={previewFile.url}
+                      controls
+                      className="w-full"
+                    >
+                      Your browser does not support the audio tag.
+                    </audio>
+                  </div>
+                ) : (
+                  <div className="text-center bg-white rounded-lg p-8">
+                    <FileIcon className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                    <p className="text-sm text-gray-600 mb-4">
+                      Preview not available for this file type
+                    </p>
+                    <Button onClick={() => window.open(previewFile.url, '_blank')}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download File
+                    </Button>
                   </div>
                 )}
+              </div>
+
+              {/* File Details Footer */}
+              <div className="border-t bg-white p-4">
+                <div className="flex flex-wrap items-center justify-between text-sm text-gray-600">
+                  <div className="flex items-center space-x-4">
+                    <span>Size: {formatFileSize(previewFile.size)}</span>
+                    <span>Type: {previewFile.mimeType}</span>
+                    <span>Uploaded: {formatDate(previewFile.uploadedAt)}</span>
+                  </div>
+                  {previewFile.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {previewFile.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -551,13 +786,31 @@ interface FolderCardProps {
   viewMode: 'grid' | 'list';
   onSelect: () => void;
   onDelete: (folderId: string) => void;
+  onDragOver?: (e: React.DragEvent, folderId: string) => void;
+  onDragLeave?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent, folderId: string) => void;
+  isDragOver?: boolean;
 }
 
-function FolderCard({ folder, viewMode, onSelect, onDelete }: FolderCardProps) {
+function FolderCard({
+  folder,
+  viewMode,
+  onSelect,
+  onDelete,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  isDragOver = false
+}: FolderCardProps) {
   if (viewMode === 'list') {
     return (
-      <Card 
-        className="p-3 hover:shadow-md transition-shadow cursor-pointer"
+      <Card
+        className={`p-3 hover:shadow-md transition-all duration-200 cursor-pointer ${
+          isDragOver ? 'ring-2 ring-blue-500 bg-blue-50 shadow-lg scale-105' : ''
+        }`}
+        onDragOver={(e) => onDragOver?.(e, folder.id)}
+        onDragLeave={onDragLeave}
+        onDrop={(e) => onDrop?.(e, folder.id)}
       >
         <div className="flex items-center space-x-3">
           <div 
@@ -593,8 +846,13 @@ function FolderCard({ folder, viewMode, onSelect, onDelete }: FolderCardProps) {
   }
 
   return (
-    <Card 
-      className="p-4 hover:shadow-md transition-shadow cursor-pointer group relative"
+    <Card
+      className={`p-4 hover:shadow-md transition-all duration-200 cursor-pointer group relative ${
+        isDragOver ? 'ring-2 ring-blue-500 bg-blue-50 shadow-lg scale-105' : ''
+      }`}
+      onDragOver={(e) => onDragOver?.(e, folder.id)}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => onDrop?.(e, folder.id)}
     >
       <div className="text-center" onClick={onSelect}>
         <div 
@@ -693,16 +951,33 @@ interface FileCardProps {
   getFileIcon: (type: MediaType) => React.ReactNode;
   onPreview: (file: MediaFile) => void;
   onDelete: (fileId: string) => void;
+  onDragStart?: (e: React.DragEvent, file: MediaFile) => void;
+  onDragEnd?: () => void;
+  isDragging?: boolean;
 }
 
-function FileCard({ file, viewMode, isSelected, onSelect, getFileIcon, onPreview, onDelete }: FileCardProps) {
+function FileCard({
+  file,
+  viewMode,
+  isSelected,
+  onSelect,
+  getFileIcon,
+  onPreview,
+  onDelete,
+  onDragStart,
+  onDragEnd,
+  isDragging = false
+}: FileCardProps) {
   if (viewMode === 'list') {
     return (
-      <Card 
+      <Card
         className={`p-3 hover:shadow-md transition-shadow cursor-pointer ${
           isSelected ? 'ring-2 ring-blue-500' : ''
-        }`}
+        } ${isDragging ? 'opacity-50' : ''}`}
         onClick={onSelect}
+        draggable
+        onDragStart={(e) => onDragStart?.(e, file)}
+        onDragEnd={onDragEnd}
       >
         <div className="flex items-center space-x-3">
           <div className="h-8 w-8 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -764,12 +1039,15 @@ function FileCard({ file, viewMode, isSelected, onSelect, getFileIcon, onPreview
   }
 
   return (
-    <Card 
+    <Card
       className={`p-4 hover:shadow-md transition-shadow cursor-pointer ${
         isSelected ? 'ring-2 ring-blue-500' : ''
-      }`}
+      } ${isDragging ? 'opacity-50' : ''}`}
       onClick={onSelect}
       onDoubleClick={() => onPreview(file)}
+      draggable
+      onDragStart={(e) => onDragStart?.(e, file)}
+      onDragEnd={onDragEnd}
     >
       <div className="text-center">
         <div className="h-16 w-16 mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-2 overflow-hidden">

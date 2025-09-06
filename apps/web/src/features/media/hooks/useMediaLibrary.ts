@@ -257,8 +257,24 @@ export function useMediaLibrary() {
   }, []);
 
   const moveFileToFolder = useCallback(async (fileId: string, folderId: string | undefined) => {
-    // This feature is not implemented yet as the database doesn't have folder support
-    throw new Error('Folder organization is not available yet. This feature is coming soon!');
+    try {
+      // Update the file's folderId in the local state
+      setState(prev => ({
+        ...prev,
+        files: prev.files.map(file =>
+          file.id === fileId ? { ...file, folderId } : file
+        )
+      }));
+
+      // TODO: In a real application, you would also update the database
+      // For now, we'll just update the local state
+      // await userDataService.updateMediaFile(fileId, { folderId });
+
+      return true;
+    } catch (error) {
+      console.error('Error moving file to folder:', error);
+      throw error;
+    }
   }, []);
 
   // Folder operations

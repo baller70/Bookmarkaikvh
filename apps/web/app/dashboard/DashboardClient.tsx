@@ -2,7 +2,7 @@
 
 /* eslint-disable no-unused-vars */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation';
 import { useAnalytics } from '../../src/hooks/useAnalytics'
 import { usePomodoro } from '../../src/features/pomodoro/hooks/usePomodoro'
@@ -25,6 +25,7 @@ import { Switch } from '../../src/components/ui/switch'
 import { Badge } from '../../src/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '../../src/components/ui/dropdown-menu'
 import { BookmarkManager } from '../../components/bookmarks/BookmarkManager'
+import { UploadButton } from '../../components/bookmarks/UploadButton'
 
 import { 
   Search, 
@@ -109,6 +110,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../src/components/u
 import { ARPTab } from '../../src/features/arp/components/ARPTab'
 import { CommentTab } from '../../src/features/comments/components/CommentTab'
 import { GoalEditDialog } from '../../src/features/goals/components/GoalEditDialog'
+import { GoalFolderDialog } from '../../src/features/goals/components/GoalFolderDialog'
+import GoalFolderCard from '../../src/features/goals/components/GoalFolderCard'
+import { GoalCard } from '../../src/features/goals/components/GoalCard'
+import { goalService, type GoalFolder, type Goal } from '../../src/services/goalService'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../src/components/ui/tooltip'
 import {
   DndContext,
@@ -192,6 +197,8 @@ export default function Dashboard() {
   const scrollPositionRef = useRef({ x: 0, y: 0 })
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [categories, setCategories] = useState<any[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
   const [chartTimePeriod, setChartTimePeriod] = useState('3months')
   const [newBookmark, setNewBookmark] = useState({
     title: '',
@@ -217,7 +224,7 @@ export default function Dashboard() {
   // near top state declarations after other states
   const [folderAssignments, setFolderAssignments] = useState<FolderHierarchyAssignment[]>([]);
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
-  const [selectedGoalFolder, setSelectedGoalFolder] = useState<Folder | null>(null);
+  const [selectedGoalFolder, setSelectedGoalFolder] = useState<GoalFolder | null>(null);
   // Folder creation states
   const [showAddFolder, setShowAddFolder] = useState(false);
   const [newFolder, setNewFolder] = useState({
@@ -300,6 +307,19 @@ export default function Dashboard() {
       notes: 'Focusing on Next.js 14 and React Server Components'
     }
   ]);
+
+  // --- Real Goal Folders and Goals state ---
+  const [goalFolders, setGoalFolders] = useState<GoalFolder[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [isLoadingGoals, setIsLoadingGoals] = useState(false);
+  const [goalFolderDialogOpen, setGoalFolderDialogOpen] = useState(false);
+  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
+  const [selectedFolderIdForGoal, setSelectedFolderIdForGoal] = useState<string | undefined>(undefined);
+
+  // Hierarchical navigation state for Goal 2.0
+  const [currentGoalFolder, setCurrentGoalFolder] = useState<GoalFolder | null>(null);
+  const [goalNavigationMode, setGoalNavigationMode] = useState<'main' | 'folder'>('main');
+  const [goalError, setGoalError] = useState<string | null>(null);
 
   // --- Bookmark data state (fetched from database) ---
   const [bookmarks, setBookmarks] = useState<any[]>([]);
@@ -632,27 +652,65 @@ export default function Dashboard() {
   const [bulkMode, setBulkMode] = useState(false);
   const scrollLockRef = useRef(false);
 
-  // Generate dynamic folders from dedicated categories API
+  // Load categories from the dedicated categories API
   useEffect(() => {
-    const loadDynamicFolders = async () => {
+    const loadCategories = async () => {
       try {
-        // Fetch categories from the dedicated categories API
-        console.log('🔄 Loading dynamic folders from categories API...');
+        setIsLoadingCategories(true);
+        console.log('🔄 Loading categories from categories API...');
         const response = await fetch(`/api/categories?t=${Date.now()}`, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache'
           }
         });
+
         const data = await response.json();
-        console.log('📁 Initial dynamic folders API response:', data);
-        
+
         if (data.success && data.categories) {
+          setCategories(data.categories);
+          console.log('📁 Loaded categories:', data.categories.length);
+        } else {
+          console.error('❌ Failed to load categories:', data);
+          // Fallback to default categories if API fails
+          setCategories([
+            { name: 'Development', id: 'development' },
+            { name: 'Design', id: 'design' },
+            { name: 'Marketing', id: 'marketing' },
+            { name: 'Productivity', id: 'productivity' },
+            { name: 'Research', id: 'research' }
+          ]);
+        }
+      } catch (error) {
+        console.error('❌ Error loading categories:', error);
+        // Fallback to default categories
+        setCategories([
+          { name: 'Development', id: 'development' },
+          { name: 'Design', id: 'design' },
+          { name: 'Marketing', id: 'marketing' },
+          { name: 'Productivity', id: 'productivity' },
+          { name: 'Research', id: 'research' }
+        ]);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
+  // Generate dynamic folders from loaded categories
+  useEffect(() => {
+    const loadDynamicFolders = async () => {
+      try {
+        console.log('🔄 Loading dynamic folders from categories...');
+
+        if (categories.length > 0) {
           // Convert categories to folder format
-          const folders = data.categories.map((category: any) => ({
+          const folders = categories.map((category: any) => ({
             id: `folder-${category.id}`,
             name: category.name,
-            description: category.description,
+            description: category.description || `${category.name} related bookmarks`,
             color: category.color,
             bookmarkCount: category.bookmarkCount
           }));
@@ -671,7 +729,7 @@ export default function Dashboard() {
     };
 
     loadDynamicFolders();
-  }, []); // Load once on component mount
+  }, [categories]); // Regenerate folders when categories change
 
   // Reset compact view mode when switching away from compact/list view
   useEffect(() => {
@@ -921,6 +979,55 @@ export default function Dashboard() {
     }
   }
 
+  // Load goal folders and goals from database
+  const loadGoalFolders = async () => {
+    console.log('🎯 Loading goal folders...');
+    setGoalError(null);
+    try {
+      const folders = await goalService.getGoalFolders();
+      console.log('📁 Loaded goal folders:', folders);
+      console.log('📁 Setting goalFolders state with:', folders?.length || 0, 'folders');
+      setGoalFolders(folders || []);
+      console.log('✅ Goal folders state updated successfully');
+    } catch (error) {
+      console.error('❌ Error loading goal folders:', error);
+      setGoalFolders([]);
+      // Don't set error for authentication issues in development
+      if (!error.message?.includes('User not authenticated')) {
+        setGoalError('Failed to load goal folders');
+      }
+    }
+  };
+
+  const loadGoals = async () => {
+    console.log('🎯 Loading goals...');
+    try {
+      const allGoals = await goalService.getGoals();
+      console.log('🎯 Loaded goals:', allGoals);
+      setGoals(allGoals || []);
+    } catch (error) {
+      console.error('❌ Error loading goals:', error);
+      setGoals([]);
+      // Don't set error for authentication issues in development
+      if (!error.message?.includes('User not authenticated')) {
+        setGoalError('Failed to load goals');
+      }
+    }
+  };
+
+  const loadGoalData = async () => {
+    setIsLoadingGoals(true);
+    setGoalError(null);
+    try {
+      await Promise.all([loadGoalFolders(), loadGoals()]);
+    } catch (error) {
+      console.error('❌ Error loading goal data:', error);
+      setGoalError('Failed to load goal data');
+    } finally {
+      setIsLoadingGoals(false);
+    }
+  };
+
   // Load bookmarks from database on component mount
   useEffect(() => {
     console.log('🔄 Mount effect triggered, loading bookmarks...');
@@ -948,6 +1055,12 @@ export default function Dashboard() {
     
     return () => clearTimeout(timeout);
   }, [])
+
+  // Load goal data on component mount
+  useEffect(() => {
+    console.log('🎯 Loading goal data...');
+    loadGoalData();
+  }, []);
 
   // Debug bookmarks state changes
   useEffect(() => {
@@ -1095,14 +1208,62 @@ export default function Dashboard() {
     }));
   }, [bookmarks]);
 
-  const filteredBookmarks = bookmarks.filter(bookmark => {
-    const matchesSearch = bookmark.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         bookmark.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (Array.isArray(bookmark.tags) && bookmark.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase())))
-    
+  // Use search API when there's a search query, otherwise filter locally
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+
+  // Debounced search function
+  const performSearch = useCallback(async (query: string, category: string) => {
+    if (!query.trim()) {
+      setSearchResults([])
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const params = new URLSearchParams({
+        query: query,
+        limit: '50',
+        offset: '0'
+      })
+
+      if (category !== 'all') {
+        params.append('category', category)
+      }
+
+      const response = await fetch(`/api/bookmarks/search?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        setSearchResults(data.bookmarks || [])
+      } else {
+        console.error('Search failed:', response.statusText)
+        setSearchResults([])
+      }
+    } catch (error) {
+      console.error('Search error:', error)
+      setSearchResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }, [])
+
+  // Debounce search calls
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.trim()) {
+        performSearch(searchQuery, selectedCategory)
+      } else {
+        setSearchResults([])
+      }
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery, selectedCategory, performSearch])
+
+  // Use search results when available, otherwise filter locally
+  const filteredBookmarks = searchQuery.trim() ? searchResults : bookmarks.filter(bookmark => {
     const matchesCategory = selectedCategory === 'all' || bookmark.category.toLowerCase() === selectedCategory.toLowerCase()
-    
-    return matchesSearch && matchesCategory
+    return matchesCategory
   })
 
   // Loading state and empty state handling
@@ -2122,39 +2283,54 @@ export default function Dashboard() {
       <div className="absolute top-12 right-2 flex flex-col items-center space-y-1 opacity-40 group-hover:opacity-100 transition-opacity duration-200">
         <Tooltip>
           <TooltipTrigger asChild>
-            <button 
+            <button
               className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation()
                 // Toggle favorite for this specific bookmark
                 const newFavoriteStatus = !bookmark.isFavorite
-                setBookmarks(prev => prev.map(b => 
-                  b.id === bookmark.id 
+
+                // Optimistically update the UI
+                setBookmarks(prev => prev.map(b =>
+                  b.id === bookmark.id
                     ? { ...b, isFavorite: newFavoriteStatus }
                     : b
                 ))
-                
-                // Save to backend
-                fetch('/api/bookmarks', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    id: bookmark.id,
-                    user_id: 'dev-user-123',
-                    title: bookmark.title,
-                    url: bookmark.url,
-                    description: bookmark.description,
-                    category: bookmark.category,
-                    tags: bookmark.tags,
-                    notes: bookmark.notes,
-                    isFavorite: newFavoriteStatus,
-                    ai_summary: bookmark.ai_summary,
-                    ai_tags: bookmark.ai_tags,
-                    ai_category: bookmark.ai_category
-                  }),
-                })
+
+                try {
+                  // Save to backend using the dedicated favorite endpoint
+                  const response = await fetch(`/api/bookmarks/${bookmark.id}/favorite`, {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      isFavorite: newFavoriteStatus,
+                      user_id: 'dev-user-123'
+                    }),
+                  })
+
+                  if (!response.ok) {
+                    const errorData = await response.json()
+                    throw new Error(errorData.error || 'Failed to update favorite status')
+                  }
+
+                  const result = await response.json()
+                  console.log('✅ Favorite status updated successfully:', result)
+
+                  // Show success notification
+                  showNotification(newFavoriteStatus ? 'Added to favorites!' : 'Removed from favorites!')
+
+                } catch (error) {
+                  console.error('❌ Error updating favorite status:', error)
+                  // Revert the optimistic update on error
+                  setBookmarks(prev => prev.map(b =>
+                    b.id === bookmark.id
+                      ? { ...b, isFavorite: !newFavoriteStatus }
+                      : b
+                  ))
+                  showNotification('Failed to update favorite status. Please try again.')
+                }
               }}
             >
               <Heart className={`h-4 w-4 ${bookmark.isFavorite ? 'text-red-500 fill-red-500' : 'text-gray-400 hover:text-red-500'}`} />
@@ -2636,13 +2812,15 @@ export default function Dashboard() {
 
       {/* Background Website Logo with 5% opacity - Custom background takes priority */}
       {(() => {
-        if (bookmark.customBackground) {
+        // Priority: custom_background > customBackground > userDefaultLogo > automatic favicon
+        const customBg = (bookmark as any).custom_background || bookmark.customBackground;
+        if (customBg) {
           return (
-            <div 
+            <div
               className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
               style={{
-                backgroundImage: `url(${bookmark.customBackground})`,
-                backgroundSize: (bookmark.customBackground && /logo\.clearbit\.com|faviconkit\.com|s2\/favicons/.test(bookmark.customBackground)) ? '140% 140%' : 'cover',
+                backgroundImage: `url(${customBg})`,
+                backgroundSize: (customBg && /logo\.clearbit\.com|faviconkit\.com|s2\/favicons/.test(customBg)) ? '140% 140%' : 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 opacity: 0.10
@@ -2650,11 +2828,10 @@ export default function Dashboard() {
             />
           );
         } else {
-          const domain = extractDomain(bookmark.url);
-          const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-          const bg = bookmark.customBackground || userDefaultLogo || faviconUrl;
+          // Priority: DNA profile default > website favicon > placeholder for background
+          const bg = userDefaultLogo || bookmark.favicon || "/placeholder.svg";
           return (
-            <div 
+            <div
               className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
               style={{
                 backgroundImage: `url(${bg})`,
@@ -2675,17 +2852,17 @@ export default function Dashboard() {
           <div className="flex items-center space-x-4">
             <div className="w-12 h-12 rounded-xl bg-black flex items-center justify-center ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
               {(() => {
-                const domain = extractDomain(bookmark.url);
-                const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                // Priority: custom_favicon > website favicon > placeholder
+                const displayImage = (bookmark as any).custom_favicon || bookmark.favicon || "/placeholder.svg";
                 return (
-                  <img 
-                    src={bookmark.customBackground || faviconUrl} 
+                  <img
+                    src={displayImage}
                     alt={`${bookmark.title} favicon`}
                     className="w-8 h-8 rounded-lg"
                     onError={(e) => {
                       const el = e.target as HTMLImageElement;
                       el.onerror = null;
-                      el.src = userDefaultLogo || "/placeholder.svg";
+                      el.src = bookmark.favicon || "/placeholder.svg";
                     }}
                   />
                 );
@@ -2768,10 +2945,8 @@ export default function Dashboard() {
         <div className="mb-4 flex justify-center">
           <div className="relative">
             {(() => {
-              const domain = extractDomain(bookmark.url);
-              const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-              const globalLogo = userDefaultLogo && !/default-profile/i.test(userDefaultLogo) && userDefaultLogo.trim() !== '' ? userDefaultLogo : undefined;
-              const src = globalLogo || faviconUrl;
+              // Priority: custom_logo > DNA profile default > website favicon > placeholder
+              const src = bookmark.custom_logo || userDefaultLogo || bookmark.favicon || "/placeholder.svg";
               return (
                 <img 
                   src={src}
@@ -2780,7 +2955,7 @@ export default function Dashboard() {
                   onError={(e) => {
                     const el = e.target as HTMLImageElement;
                     el.onerror = null;
-                    el.src = "/placeholder.svg";
+                    el.src = userDefaultLogo || bookmark.favicon || "/placeholder.svg";
                   }}
                 />
               );
@@ -3027,22 +3202,23 @@ export default function Dashboard() {
          )}
         {/* Background Website Logo with 5% opacity - Custom background takes priority */}
         {(() => {
-          if (bookmark.customBackground) {
+          // Priority: custom_background > customBackground > userDefaultLogo > automatic favicon
+          const customBg = (bookmark as any).custom_background || bookmark.customBackground;
+          if (customBg) {
             return (
-              <div 
+              <div
                 className="absolute inset-0 bg-cover bg-center bg-no-repeat"
                 style={{
-                  backgroundImage: `url(${bookmark.customBackground})`,
+                  backgroundImage: `url(${customBg})`,
                   opacity: 0.10
                 }}
               />
             );
           } else {
-            const domain = extractDomain(bookmark.url);
-            const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-            const bg = bookmark.customBackground || userDefaultLogo || faviconUrl;
+            // Priority: DNA profile default > website favicon > placeholder for background
+            const bg = userDefaultLogo || bookmark.favicon || "/placeholder.svg";
             return (
-              <div 
+              <div
                 className="absolute inset-0 bg-cover bg-center bg-no-repeat"
                 style={{
                   backgroundImage: `url(${bg})`,
@@ -3059,17 +3235,17 @@ export default function Dashboard() {
               <div className="w-12 h-12">
                 <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center ring-1 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm m-1">
                   {(() => {
-                    const domain = extractDomain(bookmark.url);
-                    const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                    // Priority: custom_favicon > website favicon > placeholder
+                    const displayImage = (bookmark as any).custom_favicon || bookmark.favicon || "/placeholder.svg";
                     return (
-                      <img 
-                        src={bookmark.customBackground || faviconUrl} 
+                      <img
+                        src={displayImage}
                         alt={`${bookmark.title} favicon`}
                         className="w-6 h-6 rounded"
                         onError={(e) => {
                           const el = e.target as HTMLImageElement;
                           el.onerror = null;
-                          el.src = userDefaultLogo || "/placeholder.svg";
+                          el.src = bookmark.favicon || "/placeholder.svg";
                         }}
                       />
                     );
@@ -3108,19 +3284,17 @@ export default function Dashboard() {
               )}
             </div>
             {(() => {
-              const domain = extractDomain(bookmark.url);
-              const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-              const globalLogo = userDefaultLogo && !/default-profile/i.test(userDefaultLogo) && userDefaultLogo.trim() !== '' ? userDefaultLogo : undefined;
-              const src = globalLogo || faviconUrl;
+              // Priority: custom_logo > DNA profile default > website favicon > placeholder
+              const src = bookmark.custom_logo || userDefaultLogo || bookmark.favicon || "/placeholder.svg";
               return (
-                <img 
+                <img
                   src={src}
                   alt={`${bookmark.title} image`}
                   className="w-16 h-16 object-cover rounded-full border border-gray-300"
                   onError={(e) => {
                     const el = e.target as HTMLImageElement;
                     el.onerror = null;
-                    el.src = "/placeholder.svg";
+                    el.src = userDefaultLogo || bookmark.favicon || "/placeholder.svg";
                   }}
                 />
               );
@@ -3448,9 +3622,8 @@ export default function Dashboard() {
             />
           );
         } else {
-          const domain = extractDomain(bookmark.url);
-          const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-          const bg = bookmark.customBackground || userDefaultLogo || faviconUrl;
+          // Priority: custom_background > DNA profile default > website favicon > placeholder
+          const bg = bookmark.customBackground || userDefaultLogo || bookmark.favicon || "/placeholder.svg";
           return (
             <div 
               className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -3474,17 +3647,17 @@ export default function Dashboard() {
             <div className="flex items-center space-x-4 mb-2">
               <div className="w-14 h-14 rounded-xl bg-black flex items-center justify-center ring-2 ring-gray-300/50 group-hover:ring-gray-400 transition-all duration-300 shadow-sm">
                 {(() => {
-                  const domain = extractDomain(bookmark.url);
-                  const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+                  // Priority: custom_favicon > website favicon > placeholder
+                  const displayImage = (bookmark as any).custom_favicon || bookmark.favicon || "/placeholder.svg";
                   return (
-                    <img 
-                      src={bookmark.customBackground || faviconUrl} 
+                    <img
+                      src={displayImage}
                       alt={`${bookmark.title} favicon`}
                       className="w-10 h-10 rounded-lg"
                       onError={(e) => {
                         const el = e.target as HTMLImageElement;
                         el.onerror = null;
-                        el.src = userDefaultLogo || "/placeholder.svg";
+                        el.src = bookmark.favicon || "/placeholder.svg";
                       }}
                     />
                   );
@@ -3510,19 +3683,17 @@ export default function Dashboard() {
           {/* Top Right: Profile Image */}
           <div className="flex-shrink-0">
             {(() => {
-              const domain = extractDomain(bookmark.url);
-              const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-              const globalLogo = userDefaultLogo && !/default-profile/i.test(userDefaultLogo) && userDefaultLogo.trim() !== '' ? userDefaultLogo : undefined;
-              const src = globalLogo || faviconUrl;
+              // Priority: custom_logo > DNA profile default > website favicon > placeholder
+              const src = bookmark.custom_logo || userDefaultLogo || bookmark.favicon || "/placeholder.svg";
               return (
-                <img 
+                <img
                   src={src}
                   alt={`${bookmark.title} image`}
                   className="w-16 h-16 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-2 ring-gray-200/50 group-hover:ring-blue-300/60 transition-all duration-300 shadow-md"
                   onError={(e) => {
                     const el = e.target as HTMLImageElement;
                     el.onerror = null;
-                    el.src = "/placeholder.svg";
+                    el.src = userDefaultLogo || bookmark.favicon || "/placeholder.svg";
                   }}
                 />
               );
@@ -3778,8 +3949,8 @@ export default function Dashboard() {
       </div>
     )
   }
-  // Goal Folder Card component (non-sortable)
-  const GoalFolderCard = ({ folder, bookmarkCount, onEdit, onDelete, onAddBookmark, onDrop, onDragOver, onClick }: {
+  // Bookmark Folder Card component (non-sortable) - RENAMED to avoid conflict with GoalFolderCard
+  const BookmarkFolderCard = ({ folder, bookmarkCount, onEdit, onDelete, onAddBookmark, onDrop, onDragOver, onClick }: {
     folder: Folder;
     bookmarkCount: number;
     onEdit: (folder: Folder) => void;
@@ -3938,8 +4109,8 @@ export default function Dashboard() {
             </div>
           </div>
           
-          {/* Use the separated GoalFolderCard component */}
-          <GoalFolderCard
+          {/* Use the separated BookmarkFolderCard component */}
+          <BookmarkFolderCard
             folder={folder}
             bookmarkCount={bookmarkCount}
             onEdit={onEdit}
@@ -4368,124 +4539,449 @@ export default function Dashboard() {
           </div>
         )
       case 'goal2':
-        const handleGoalEdit = (folder: Folder) => {
+        // Goal Folder Management Handlers
+        const handleCreateFolder = () => {
+          setSelectedGoalFolder(null);
+          setGoalFolderDialogOpen(true);
+        };
+
+        const handleEditFolder = (folder: GoalFolder) => {
           console.log('Edit goal folder:', folder);
           setSelectedGoalFolder(folder);
+          setGoalFolderDialogOpen(true);
+        };
+
+        const handleDeleteFolder = async (folderId: string) => {
+          try {
+            await goalService.deleteGoalFolder(folderId, 'unassign');
+            await loadGoalData(); // Reload data
+            showNotification('Goal folder deleted successfully!');
+          } catch (error) {
+            console.error('Error deleting goal folder:', error);
+            showNotification('Failed to delete goal folder', 'error');
+          }
+        };
+
+        const handleFolderSubmit = async (folderData: GoalFolder) => {
+          try {
+            console.log('🎯 handleFolderSubmit called with:', folderData);
+            console.log('🎯 selectedGoalFolder:', selectedGoalFolder);
+
+            if (selectedGoalFolder) {
+              // Update existing folder
+              console.log('🎯 Updating existing folder...');
+              await goalService.updateGoalFolder(selectedGoalFolder.id, folderData);
+              showNotification(`Folder "${folderData.name}" updated successfully!`);
+            } else {
+              // Create new folder
+              console.log('🎯 Creating new folder...');
+              await goalService.createGoalFolder(folderData);
+              showNotification(`Folder "${folderData.name}" created successfully!`);
+            }
+
+            console.log('🎯 Reloading goal data...');
+            await loadGoalData(); // Reload data
+            console.log('🎯 Goal data reloaded successfully');
+
+            // Clear state after successful operation
+            setSelectedGoalFolder(null);
+            setGoalFolderDialogOpen(false);
+          } catch (error) {
+            console.error('❌ Error saving goal folder:', error);
+            showNotification('Failed to save goal folder', 'error');
+          }
+        };
+
+        // Goal Management Handlers
+        const handleCreateGoal = (folderId?: string) => {
+          setSelectedGoal(null);
+          setSelectedFolderIdForGoal(folderId);
           setGoalDialogOpen(true);
         };
 
-        const handleGoalDelete = (folderId: string) => {
-          console.log('Delete goal folder:', folderId);
-          setMockGoalFolders(prev => prev.filter(goal => goal.id !== folderId));
-          showNotification(`Goal deleted successfully!`);
+        const handleEditGoal = (goal: Goal) => {
+          setSelectedGoal(goal);
+          setGoalDialogOpen(true);
         };
 
-        const handleGoalAddBookmark = (folderId: string) => {
-          console.log('Add bookmark to goal folder:', folderId);
-          // Find the goal and open bookmark selection
-          const goal = mockGoalFolders.find(g => g.id === folderId);
-          if (goal) {
-            setSelectedGoalFolder(goal);
-            setGoalDialogOpen(true);
+        const handleDeleteGoal = async (goalId: string) => {
+          try {
+            await goalService.deleteGoal(goalId);
+            await loadGoalData(); // Reload data
+            showNotification('Goal deleted successfully!');
+          } catch (error) {
+            console.error('Error deleting goal:', error);
+            showNotification('Failed to delete goal', 'error');
           }
         };
 
-        const handleGoalDrop = (folderId: string, bookmark: BookmarkWithRelations) => {
-          console.log('Drop bookmark to goal folder:', folderId, bookmark);
-          // Add bookmark to goal's connected bookmarks
-          setMockGoalFolders(prev => prev.map(goal => 
-            goal.id === folderId 
-              ? { 
-                  ...goal, 
-                  connected_bookmarks: [...(goal.connected_bookmarks || []), bookmark.id.toString()]
+        const handleGoalSubmit = async (goalData: Goal) => {
+          try {
+            console.log('🎯 handleGoalSubmit called with:', goalData);
+            console.log('🎯 selectedGoal:', selectedGoal);
+
+            if (selectedGoal) {
+              // Update existing goal
+              console.log('🎯 Updating existing goal...');
+              await goalService.updateGoal(selectedGoal.id, goalData);
+              showNotification(`Goal "${goalData.name}" updated successfully!`);
+            } else {
+              // Create new goal
+              console.log('🎯 Creating new goal...');
+              const createdGoal = await goalService.createGoal(goalData);
+              console.log('🎯 Goal created:', createdGoal);
+              showNotification(`Goal "${goalData.name}" created successfully!`);
+            }
+            console.log('🎯 Reloading goal data...');
+            await loadGoalData(); // Reload data
+            setSelectedGoal(null);
+            setSelectedFolderIdForGoal(undefined);
+            setGoalDialogOpen(false);
+          } catch (error) {
+            console.error('❌ Error saving goal:', error);
+            console.error('❌ Error details:', error.message);
+            showNotification('Failed to save goal', 'error');
+          }
+        };
+
+        // Drag and Drop Handlers
+        const handleGoalDrop = async (folderId: string, item: any) => {
+          try {
+            console.log('🎯 handleGoalDrop called with:', { folderId, item });
+
+            if (item.type === 'goal') {
+              // Moving a goal to a different folder
+              if (item.folder_id !== folderId) {
+                console.log('🎯 Moving goal from folder', item.folder_id, 'to folder', folderId);
+
+                // Validate that the target folder exists in our current folder list
+                const targetFolder = goalFolders.find(folder => folder.id === folderId);
+                if (!targetFolder) {
+                  console.error('❌ Target folder not found in current folder list:', folderId);
+                  console.log('📁 Available folders:', goalFolders.map(f => ({ id: f.id, name: f.name })));
+                  showNotification('Target folder not found. Please refresh and try again.', 'error');
+                  return;
                 }
-              : goal
-          ));
-          showNotification(`Bookmark "${bookmark.title}" connected to goal!`);
-        };
 
-        const handleGoalDragOver = (event: React.DragEvent) => {
-          event.preventDefault();
-        };
-
-        const handleGoalSubmit = (goalData: any) => {
-          console.log('Goal submitted:', goalData);
-          
-          if (selectedGoalFolder) {
-            // Update existing goal
-            setMockGoalFolders(prev => prev.map(goal => 
-              goal.id === selectedGoalFolder.id ? goalData : goal
-            ));
-            showNotification(`Goal "${goalData.name}" updated successfully!`);
-          } else {
-            // Create new goal
-            setMockGoalFolders(prev => [...prev, goalData]);
-            showNotification(`Goal "${goalData.name}" created successfully!`);
+                console.log('✅ Target folder found:', targetFolder.name);
+                await goalService.moveGoalToFolder(item.id, folderId);
+                await loadGoalData(); // Reload data
+                showNotification(`Goal "${item.name}" moved to "${targetFolder.name}" successfully!`);
+              } else {
+                console.log('🎯 Goal is already in the target folder, no action needed');
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error moving goal:', error);
+            console.error('❌ Error details:', error.message);
+            showNotification(`Failed to move goal: ${error.message}`, 'error');
           }
-          
-          setSelectedGoalFolder(null);
-          setGoalDialogOpen(false);
         };
+
+        // Navigation handlers for hierarchical folder navigation
+        const handleFolderClick = (folder: GoalFolder) => {
+          console.log('🎯 Navigating to folder:', folder.name);
+          setCurrentGoalFolder(folder);
+          setGoalNavigationMode('folder');
+        };
+
+        const handleBackToMain = () => {
+          console.log('🎯 Navigating back to main view');
+          setCurrentGoalFolder(null);
+          setGoalNavigationMode('main');
+        };
+
+        // Filter goals based on current navigation mode
+        const getVisibleGoals = () => {
+          if (goalNavigationMode === 'folder' && currentGoalFolder) {
+            // In folder view: show only goals assigned to current folder
+            return goals.filter(goal => goal.folder_id === currentGoalFolder.id);
+          } else {
+            // In main view: show only unassigned goals (goals without folder_id)
+            return goals.filter(goal => !goal.folder_id);
+          }
+        };
+
+        const visibleGoals = getVisibleGoals();
 
         return (
           <div className="space-y-6">
+            {/* Header Section */}
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Goal 2.0</h2>
-              <p className="text-gray-600">Advanced goal management with deadline tracking and progress monitoring</p>
+              <p className="text-gray-600">Advanced goal management with folders, deadline tracking and progress monitoring</p>
             </div>
-            
-            <div className="flex justify-end mb-6">
-              <Button
-                onClick={() => {
-                  setSelectedGoalFolder(null);
-                  setGoalDialogOpen(true);
-                }}
-                className="flex items-center space-x-2"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Create New Goal</span>
-              </Button>
-            </div>
-            
-            <ClientOnlyDndProvider>
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext items={mockGoalFolders.map(f => f.id)} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {mockGoalFolders.map((folder) => {
-                      const connectedBookmarksCount = folder.connected_bookmarks?.length || 0;
-                      
-                      return (
-                        <SortableGoalFolderCard
-                          key={folder.id}
-                          folder={folder}
-                          bookmarkCount={connectedBookmarksCount}
-                          onEdit={handleGoalEdit}
-                          onDelete={handleGoalDelete}
-                          onAddBookmark={handleGoalAddBookmark}
-                          onDrop={handleGoalDrop}
-                          onDragOver={handleGoalDragOver}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleGoalEdit(folder);
-                          }}
-                        />
-                      );
-                    })}
+
+            {/* Navigation and Action Bar */}
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center space-x-4">
+                {/* Back Navigation */}
+                {goalNavigationMode === 'folder' && currentGoalFolder && (
+                  <Button
+                    variant="outline"
+                    onClick={handleBackToMain}
+                    className="flex items-center space-x-2 hover:bg-blue-50 hover:border-blue-300 transition-all duration-300"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    <span>Back to Folders</span>
+                  </Button>
+                )}
+
+                {/* Breadcrumb/Current Location */}
+                <div className="flex items-center space-x-2">
+                  {goalNavigationMode === 'main' ? (
+                    <>
+                      <FolderIcon className="h-5 w-5 text-blue-600" />
+                      <h3 className="text-lg font-semibold text-gray-900">All Folders</h3>
+                      <Badge className="bg-blue-50 text-blue-700 border-blue-200">
+                        {goalFolders.length} folders
+                      </Badge>
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ backgroundColor: currentGoalFolder?.color || '#3B82F6' }}
+                      >
+                        <FolderIcon className="h-4 w-4 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">{currentGoalFolder?.name}</h3>
+                      <Badge className="bg-blue-50 text-blue-700 border-blue-200">
+                        {visibleGoals.length} goals
+                      </Badge>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-4">
+                {goalNavigationMode === 'main' && (
+                  <Button
+                    onClick={handleCreateFolder}
+                    variant="outline"
+                    className="flex items-center space-x-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Create Folder</span>
+                  </Button>
+                )}
+                <Button
+                  onClick={() => handleCreateGoal(goalNavigationMode === 'folder' ? currentGoalFolder?.id : undefined)}
+                  className="flex items-center space-x-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Create Goal</span>
+                </Button>
+
+                {isLoadingGoals && (
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span>Loading goals...</span>
                   </div>
-                </SortableContext>
-              </DndContext>
-            </ClientOnlyDndProvider>
-            
+                )}
+              </div>
+            </div>
+
+            {/* Error Display */}
+            {goalError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <div className="text-red-600">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-red-800 font-medium">Error loading goals</p>
+                    <p className="text-red-600 text-sm">{goalError}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadGoalData}
+                    className="ml-auto text-red-600 border-red-300 hover:bg-red-100"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Main Content Area */}
+            {isLoadingGoals && goalFolders.length === 0 && goals.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading your goals...</p>
+                </div>
+              </div>
+            ) : goalNavigationMode === 'main' ? (
+              /* MAIN VIEW: Show folders + unassigned goals */
+              <div className="space-y-8">
+                {/* Goal Folders Grid */}
+                {goalFolders.length > 0 ? (
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Goal Folders</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {goalFolders.map((folder) => {
+                        const folderGoals = goals.filter(goal => goal.folder_id === folder.id);
+
+                        return (
+                          <GoalFolderCard
+                            key={folder.id}
+                            folder={folder}
+                            goals={folderGoals}
+                            onEdit={handleEditFolder}
+                            onDelete={handleDeleteFolder}
+                            onCreateGoal={handleCreateGoal}
+                            onEditGoal={handleEditGoal}
+                            onDeleteGoal={handleDeleteGoal}
+                            onDrop={handleGoalDrop}
+                            onClick={handleFolderClick}
+                            disableLink={false}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <FolderIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No goal folders yet</h3>
+                    <p className="text-gray-500 mb-4">Create your first folder to organize your goals</p>
+                    <Button onClick={handleCreateFolder} className="flex items-center space-x-2 mx-auto">
+                      <Plus className="h-4 w-4" />
+                      <span>Create Your First Folder</span>
+                    </Button>
+                  </div>
+                )}
+
+                {/* Unassigned Goals */}
+                {visibleGoals.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Unassigned Goals</h3>
+                    <div
+                      className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4 border-2 border-dashed border-gray-300 rounded-lg"
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={async (e) => {
+                        e.preventDefault()
+                        try {
+                          const data = e.dataTransfer.getData('application/json')
+                          const item = JSON.parse(data)
+                          if (item.type === 'goal' && item.folder_id) {
+                            // Remove goal from folder (make it unassigned)
+                            await goalService.moveGoalToFolder(item.id, null)
+                            await loadGoalData()
+                            showNotification(`Goal "${item.name}" moved to unassigned!`)
+                          }
+                        } catch (error) {
+                          console.error('Error moving goal to unassigned:', error)
+                          showNotification('Failed to move goal', 'error')
+                        }
+                      }}
+                    >
+                      {visibleGoals.map((goal) => (
+                        <GoalCard
+                          key={goal.id}
+                          goal={goal}
+                          onEdit={handleEditGoal}
+                          onDelete={handleDeleteGoal}
+                          draggable={true}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* FOLDER VIEW: Show only goals in current folder */
+              <div className="space-y-6">
+                {visibleGoals.length > 0 ? (
+                  <div
+                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4 border-2 border-dashed border-gray-300 rounded-lg"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={async (e) => {
+                      e.preventDefault()
+                      try {
+                        const data = e.dataTransfer.getData('application/json')
+                        const item = JSON.parse(data)
+                        if (item.type === 'goal' && !item.folder_id) {
+                          // Move unassigned goal to current folder
+                          await goalService.moveGoalToFolder(item.id, currentGoalFolder?.id || null)
+                          await loadGoalData()
+                          showNotification(`Goal "${item.name}" moved to "${currentGoalFolder?.name}"!`)
+                        }
+                      } catch (error) {
+                        console.error('Error moving goal to folder:', error)
+                        showNotification('Failed to move goal', 'error')
+                      }
+                    }}
+                  >
+                    {visibleGoals.map((goal) => (
+                      <GoalCard
+                        key={goal.id}
+                        goal={goal}
+                        onEdit={handleEditGoal}
+                        onDelete={handleDeleteGoal}
+                        draggable={true}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={async (e) => {
+                      e.preventDefault()
+                      try {
+                        const data = e.dataTransfer.getData('application/json')
+                        const item = JSON.parse(data)
+                        if (item.type === 'goal' && !item.folder_id) {
+                          // Move unassigned goal to current folder
+                          await goalService.moveGoalToFolder(item.id, currentGoalFolder?.id || null)
+                          await loadGoalData()
+                          showNotification(`Goal "${item.name}" moved to "${currentGoalFolder?.name}"!`)
+                        }
+                      } catch (error) {
+                        console.error('Error moving goal to folder:', error)
+                        showNotification('Failed to move goal', 'error')
+                      }
+                    }}
+                  >
+                    <Target className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No goals in this folder yet</h3>
+                    <p className="text-gray-500 mb-4">Create your first goal in "{currentGoalFolder?.name}" or drag goals here</p>
+                    <Button
+                      onClick={() => handleCreateGoal(currentGoalFolder?.id)}
+                      className="flex items-center space-x-2 mx-auto"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Create Goal</span>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+
+
+            {/* Dialogs */}
+            <GoalFolderDialog
+              open={goalFolderDialogOpen}
+              onOpenChange={setGoalFolderDialogOpen}
+              folder={selectedGoalFolder}
+              onSubmit={handleFolderSubmit}
+            />
+
             <GoalEditDialog
               open={goalDialogOpen}
               onOpenChange={setGoalDialogOpen}
-              goal={selectedGoalFolder}
+              goal={selectedGoal}
               onSubmit={handleGoalSubmit}
               bookmarks={bookmarks}
+              folders={goalFolders}
+              selectedFolderId={selectedFolderIdForGoal}
             />
           </div>
         )
@@ -4689,23 +5185,15 @@ export default function Dashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="development">Development</SelectItem>
-                  <SelectItem value="design">Design</SelectItem>
-                  <SelectItem value="marketing">Marketing</SelectItem>
-                  <SelectItem value="productivity">Productivity</SelectItem>
-                  <SelectItem value="research">Research</SelectItem>
-                  <SelectItem value="education">Education</SelectItem>
-                  <SelectItem value="entertainment">Entertainment</SelectItem>
-                  <SelectItem value="news">News</SelectItem>
-                  <SelectItem value="shopping">Shopping</SelectItem>
-                  <SelectItem value="social">Social</SelectItem>
-                  <SelectItem value="travel">Travel</SelectItem>
-                  <SelectItem value="health">Health</SelectItem>
-                  <SelectItem value="finance">Finance</SelectItem>
-                  <SelectItem value="sports">Sports</SelectItem>
-                  <SelectItem value="technology">Technology</SelectItem>
-                  <SelectItem value="business">Business</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  {isLoadingCategories ? (
+                    <SelectItem value="loading" disabled>Loading categories...</SelectItem>
+                  ) : (
+                    categories.map((category) => (
+                      <SelectItem key={category.id || category.name} value={category.name.toLowerCase()}>
+                        {category.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               <SyncButton />
@@ -5360,7 +5848,7 @@ export default function Dashboard() {
                       <div className="flex justify-center">
                         <div className="relative">
                           <img
-                            src={selectedBookmark.circularImage || "/placeholder.svg"}
+                            src={userDefaultLogo || selectedBookmark.circularImage || "/placeholder.svg"}
                             alt={`${selectedBookmark.title} image`}
                             className="w-32 h-32 object-cover rounded-full bg-gradient-to-br from-gray-100 to-gray-50 ring-2 ring-gray-200/50 shadow-lg"
                           />
@@ -5429,7 +5917,7 @@ export default function Dashboard() {
                                       ai_tags: selectedBookmark.ai_tags || [],
                                       ai_category: selectedBookmark.ai_category || selectedBookmark.category || '',
                                       isFavorite: selectedBookmark.isFavorite || false,
-                                      circularImage: imageUrl
+                                      custom_logo: imageUrl
                                     })
                                   });
 
@@ -5437,7 +5925,7 @@ export default function Dashboard() {
                                   
                                   if (result.success) {
                                     // Update UI
-                                    const updatedBookmark = { ...selectedBookmark, circularImage: imageUrl };
+                                    const updatedBookmark = { ...selectedBookmark, custom_logo: imageUrl };
                                     setBookmarks(prev => prev.map(bookmark => 
                                       bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
                                     ));
@@ -5462,293 +5950,81 @@ export default function Dashboard() {
                       </div>
                       <div className="text-center space-y-2">
                         <p className="text-sm text-gray-600">Click the camera icon to update image</p>
-                        <Button
+
+                        <UploadButton
+                          bookmarkId={String(selectedBookmark.id)}
+                          uploadType="logo"
+                          currentValue={(selectedBookmark as any).custom_logo}
+                          onUploadComplete={(url) => {
+                            const updatedBookmark = { ...selectedBookmark, custom_logo: url };
+                            setBookmarks(prev => prev.map(bookmark =>
+                              bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
+                            ));
+                            setSelectedBookmark(updatedBookmark);
+                          }}
+                          onRemove={() => {
+                            const updatedBookmark = { ...selectedBookmark, custom_logo: undefined };
+                            setBookmarks(prev => prev.map(bookmark =>
+                              bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
+                            ));
+                            setSelectedBookmark(updatedBookmark);
+                          }}
                           variant="outline"
                           size="sm"
-                          onClick={async () => {
-                            if (!selectedBookmark) return;
-                            
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = 'image/*';
-                            input.onchange = async (e) => {
-                              const file = (e.target as HTMLInputElement).files?.[0];
-                              if (!file) return;
-
-                              // Validate file size (max 5MB)
-                              if (file.size > 5 * 1024 * 1024) {
-                                showNotification('File size must be less than 5MB');
-                                return;
-                              }
-                              
-                              // Validate file type
-                              if (!file.type.startsWith('image/')) {
-                                showNotification('Please select a valid image file');
-                                return;
-                              }
-
-                              try {
-                                setUploadingBackground(true);
-                                showNotification('Uploading default logo...');
-
-                                // Upload to server
-                                const formData = new FormData();
-                                formData.append('file', file);
-                                formData.append('type', 'logo');
-                                formData.append('tags', `bookmark-${selectedBookmark.id},default-logo`);
-
-                                const uploadResponse = await fetch('/api/user-data/upload', {
-                                  method: 'POST',
-                                  body: formData
-                                });
-
-                                const uploadResult = await uploadResponse.json();
-                                
-                                if (!uploadResult.success) {
-                                  throw new Error(uploadResult.error || 'Upload failed');
-                                }
-
-                                const imageUrl = uploadResult.data.url;
-
-                                // Update bookmark with new default logo
-                                const response = await fetch('/api/bookmarks', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    id: selectedBookmark.id,
-                                    title: selectedBookmark.title,
-                                    url: selectedBookmark.url,
-                                    description: selectedBookmark.description || '',
-                                    category: selectedBookmark.category || '',
-                                    tags: Array.isArray(selectedBookmark.tags) ? selectedBookmark.tags : [],
-                                    notes: selectedBookmark.notes || '',
-                                    ai_summary: selectedBookmark.ai_summary || '',
-                                    ai_tags: selectedBookmark.ai_tags || [],
-                                    ai_category: selectedBookmark.ai_category || selectedBookmark.category || '',
-                                    isFavorite: selectedBookmark.isFavorite || false,
-                                    logo: imageUrl
-                                  })
-                                });
-
-                                const result = await response.json();
-                                
-                                if (result.success) {
-                                  // Update UI
-                                  const updatedBookmark = { ...selectedBookmark, logo: imageUrl };
-                                  setBookmarks(prev => prev.map(bookmark => 
-                                    bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
-                                  ));
-                                  setSelectedBookmark(updatedBookmark);
-                                  showNotification('Default logo set successfully!');
-                                } else {
-                                  throw new Error(result.error || 'Failed to save default logo');
-                                }
-                              } catch (error) {
-                                console.error('Default logo upload error:', error);
-                                showNotification('Failed to upload default logo. Please try again.');
-                              } finally {
-                                setUploadingBackground(false);
-                              }
-                            };
-                            input.click();
-                          }}
-                          disabled={uploadingBackground}
                           className="text-xs"
                         >
                           <ImageIcon className="h-3 w-3 mr-2" />
-                          Set Default Logo
-                        </Button>
+                          Custom Logo
+                        </UploadButton>
                         <div className="flex items-center justify-center gap-2">
-                          <Button
+                          <UploadButton
+                            bookmarkId={String(selectedBookmark.id)}
+                            uploadType="background"
+                            currentValue={selectedBookmark.customBackground}
+                            onUploadComplete={(url) => {
+                              const updatedBookmark = { ...selectedBookmark, customBackground: url };
+                              setBookmarks(prev => prev.map(bookmark =>
+                                bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
+                              ));
+                              setSelectedBookmark(updatedBookmark);
+                            }}
+                            onRemove={() => {
+                              const updatedBookmark = { ...selectedBookmark, customBackground: undefined };
+                              setBookmarks(prev => prev.map(bookmark =>
+                                bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
+                              ));
+                              setSelectedBookmark(updatedBookmark);
+                            }}
                             variant="default"
                             size="sm"
-                            onClick={async () => {
-                              if (!selectedBookmark) return;
-                              
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = 'image/*';
-                              input.onchange = async (e) => {
-                                const file = (e.target as HTMLInputElement).files?.[0];
-                                if (!file) return;
-
-                                // Validate file size (max 5MB)
-                                if (file.size > 5 * 1024 * 1024) {
-                                  showNotification('File size must be less than 5MB');
-                                  return;
-                                }
-                                
-                                // Validate file type
-                                if (!file.type.startsWith('image/')) {
-                                  showNotification('Please select a valid image file');
-                                  return;
-                                }
-
-                                try {
-                                  setUploadingBackground(true);
-                                  showNotification('Uploading background image...');
-
-                                  // Upload to server
-                                  const formData = new FormData();
-                                  formData.append('file', file);
-                                  formData.append('type', 'image');
-                                  formData.append('tags', `bookmark-${selectedBookmark.id},background`);
-
-                                  const uploadResponse = await fetch('/api/user-data/upload', {
-                                    method: 'POST',
-                                    body: formData
-                                  });
-
-                                  const uploadResult = await uploadResponse.json();
-                                  
-                                  if (!uploadResult.success) {
-                                    throw new Error(uploadResult.error || 'Upload failed');
-                                  }
-
-                                  const imageUrl = uploadResult.data.url;
-
-                                  // Update bookmark with new background
-                                  const response = await fetch('/api/bookmarks', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      id: selectedBookmark.id,
-                                      title: selectedBookmark.title,
-                                      url: selectedBookmark.url,
-                                      description: selectedBookmark.description || '',
-                                      category: selectedBookmark.category || '',
-                                      tags: Array.isArray(selectedBookmark.tags) ? selectedBookmark.tags : [],
-                                      notes: selectedBookmark.notes || '',
-                                      ai_summary: selectedBookmark.ai_summary || '',
-                                      ai_tags: selectedBookmark.ai_tags || [],
-                                      ai_category: selectedBookmark.ai_category || selectedBookmark.category || '',
-                                      isFavorite: selectedBookmark.isFavorite || false,
-                                      customBackground: imageUrl
-                                    })
-                                  });
-
-                                  const result = await response.json();
-                                  
-                                  if (result.success) {
-                                    // Update UI
-                                    const updatedBookmark = { ...selectedBookmark, customBackground: imageUrl };
-                                    setBookmarks(prev => prev.map(bookmark => 
-                                      bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
-                                    ));
-                                    setSelectedBookmark(updatedBookmark);
-                                    showNotification('Background updated successfully!');
-                                  } else {
-                                    throw new Error(result.error || 'Failed to save background');
-                                  }
-                                } catch (error) {
-                                  console.error('Background upload error:', error);
-                                  showNotification('Failed to upload background. Please try again.');
-                                } finally {
-                                  setUploadingBackground(false);
-                                }
-                              };
-                              input.click();
-                            }}
-                            disabled={uploadingBackground}
                             className="text-xs"
                           >
                             Front Background
-                          </Button>
-                          <Button
+                          </UploadButton>
+                          <UploadButton
+                            bookmarkId={String(selectedBookmark.id)}
+                            uploadType="favicon"
+                            currentValue={(selectedBookmark as any).custom_favicon}
+                            onUploadComplete={(url) => {
+                              const updatedBookmark = { ...selectedBookmark, custom_favicon: url };
+                              setBookmarks(prev => prev.map(bookmark =>
+                                bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
+                              ));
+                              setSelectedBookmark(updatedBookmark);
+                            }}
+                            onRemove={() => {
+                              const updatedBookmark = { ...selectedBookmark, custom_favicon: undefined };
+                              setBookmarks(prev => prev.map(bookmark =>
+                                bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
+                              ));
+                              setSelectedBookmark(updatedBookmark);
+                            }}
                             variant="outline"
                             size="sm"
-                            onClick={async () => {
-                              if (!selectedBookmark) return;
-                              
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.accept = 'image/*';
-                              input.onchange = async (e) => {
-                                const file = (e.target as HTMLInputElement).files?.[0];
-                                if (!file) return;
-
-                                // Validate file size (max 5MB)
-                                if (file.size > 5 * 1024 * 1024) {
-                                  showNotification('File size must be less than 5MB');
-                                  return;
-                                }
-                                
-                                // Validate file type
-                                if (!file.type.startsWith('image/')) {
-                                  showNotification('Please select a valid image file');
-                                  return;
-                                }
-
-                                try {
-                                  setUploadingBackground(true);
-                                  showNotification('Uploading favicon...');
-
-                                  // Upload to server
-                                  const formData = new FormData();
-                                  formData.append('file', file);
-                                  formData.append('type', 'image');
-                                  formData.append('tags', `bookmark-${selectedBookmark.id},favicon`);
-
-                                  const uploadResponse = await fetch('/api/user-data/upload', {
-                                    method: 'POST',
-                                    body: formData
-                                  });
-
-                                  const uploadResult = await uploadResponse.json();
-                                  
-                                  if (!uploadResult.success) {
-                                    throw new Error(uploadResult.error || 'Upload failed');
-                                  }
-
-                                  const imageUrl = uploadResult.data.url;
-
-                                  // Update bookmark with new favicon
-                                  const response = await fetch('/api/bookmarks', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      id: selectedBookmark.id,
-                                      title: selectedBookmark.title,
-                                      url: selectedBookmark.url,
-                                      description: selectedBookmark.description || '',
-                                      category: selectedBookmark.category || '',
-                                      tags: Array.isArray(selectedBookmark.tags) ? selectedBookmark.tags : [],
-                                      notes: selectedBookmark.notes || '',
-                                      ai_summary: selectedBookmark.ai_summary || '',
-                                      ai_tags: selectedBookmark.ai_tags || [],
-                                      ai_category: selectedBookmark.ai_category || selectedBookmark.category || '',
-                                      isFavorite: selectedBookmark.isFavorite || false,
-                                      faviconOverride: imageUrl
-                                    })
-                                  });
-
-                                  const result = await response.json();
-                                  
-                                  if (result.success) {
-                                    // Update UI
-                                    const updatedBookmark = { ...selectedBookmark, faviconOverride: imageUrl };
-                                    setBookmarks(prev => prev.map(bookmark => 
-                                      bookmark.id === selectedBookmark.id ? updatedBookmark : bookmark
-                                    ));
-                                    setSelectedBookmark(updatedBookmark);
-                                    showNotification('Favicon updated successfully!');
-                                  } else {
-                                    throw new Error(result.error || 'Failed to save favicon');
-                                  }
-                                } catch (error) {
-                                  console.error('Favicon upload error:', error);
-                                  showNotification('Failed to upload favicon. Please try again.');
-                                } finally {
-                                  setUploadingBackground(false);
-                                }
-                              };
-                              input.click();
-                            }}
-                            disabled={uploadingBackground}
                             className="text-xs"
                           >
                             Favicon
-                          </Button>
+                          </UploadButton>
                         </div>
                       </div>
                     </div>
@@ -5770,7 +6046,7 @@ export default function Dashboard() {
                         {editingField === 'description' ? (
                           <div className="space-y-2">
                             <Textarea
-                              value={editingValue}
+                              value={editingValue || ''}
                               onChange={(e) => setEditingValue(e.target.value)}
                               onKeyDown={handleKeyDown}
                               className="min-h-[60px]"
@@ -5856,7 +6132,7 @@ export default function Dashboard() {
                         {editingField === 'notes' ? (
                           <div className="space-y-2">
                             <Textarea
-                              value={editingValue}
+                              value={editingValue || ''}
                               onChange={(e) => setEditingValue(e.target.value)}
                               onKeyDown={handleKeyDown}
                               className="min-h-[80px]"
@@ -6028,10 +6304,8 @@ export default function Dashboard() {
                                     {/* Circular Image */}
                                     <div className="flex-shrink-0">
                                       {(() => {
-                                        const domain = extractDomain(bookmark.url);
-                                        const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-                                        const globalLogo = userDefaultLogo && !/default-profile/i.test(userDefaultLogo) && userDefaultLogo.trim() !== '' ? userDefaultLogo : undefined;
-              const src = globalLogo || faviconUrl;
+                                        // Priority: custom_logo > DNA profile default > website favicon > placeholder
+                                        const src = bookmark.custom_logo || userDefaultLogo || bookmark.favicon || "/placeholder.svg";
                                         return (
                                           <img
                                             src={src}
@@ -6040,7 +6314,7 @@ export default function Dashboard() {
                                             onError={(e) => {
                                               const el = e.target as HTMLImageElement;
                                               el.onerror = null;
-                                              el.src = "/placeholder.svg";
+                                              el.src = userDefaultLogo || bookmark.favicon || "/placeholder.svg";
                                             }}
                                           />
                                         );
@@ -7017,7 +7291,7 @@ export default function Dashboard() {
                 <label className="text-sm font-medium">DESCRIPTION</label>
                 <Textarea
                   placeholder="Enter Description"
-                  value={newBookmark.description}
+                  value={newBookmark.description || ''}
                   onChange={(e) => setNewBookmark({ ...newBookmark, description: e.target.value })}
                 />
               </div>
@@ -7121,7 +7395,7 @@ export default function Dashboard() {
                 <label className="text-sm font-medium">NOTES</label>
                 <Textarea
                   placeholder="Enter Any Notes"
-                  value={newBookmark.notes}
+                  value={newBookmark.notes || ''}
                   onChange={(e) => setNewBookmark({ ...newBookmark, notes: e.target.value })}
                 />
               </div>

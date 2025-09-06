@@ -3,9 +3,23 @@ import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { authenticateUser } from '@/lib/auth-utils';
+import { createClient } from '@supabase/supabase-js';
 
-// File-based storage for persistent bookmarks
+// Storage configuration - Supabase first, file fallback for development/testing
 const BOOKMARKS_FILE = join(process.cwd(), 'data', 'bookmarks.json');
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+
+const USE_SUPABASE = !!(
+  supabaseUrl &&
+  supabaseKey &&
+  !supabaseKey.includes('dev-placeholder') &&
+  !supabaseUrl.includes('dev-placeholder')
+)
+
+const supabase = USE_SUPABASE ? createClient(supabaseUrl, supabaseKey) : null
+const USE_FILES_FALLBACK = true;
 
 interface Bookmark {
   id: number;
@@ -70,8 +84,46 @@ interface SearchResult {
   };
 }
 
-// Load bookmarks from file
+// Load bookmarks from Supabase or file fallback
 async function loadBookmarks(): Promise<Bookmark[]> {
+  if (USE_SUPABASE && supabase) {
+    console.log('🔍 Loading bookmarks from Supabase for search');
+    try {
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Supabase search load error:', error);
+        if (USE_FILES_FALLBACK) {
+          console.log('📁 Falling back to file storage for search');
+          return loadBookmarksFromFile();
+        }
+        return [];
+      }
+
+      console.log(`✅ Loaded ${data?.length || 0} bookmarks from Supabase for search`);
+      return data || [];
+    } catch (error) {
+      console.error('❌ Supabase search connection error:', error);
+      if (USE_FILES_FALLBACK) {
+        console.log('📁 Falling back to file storage for search');
+        return loadBookmarksFromFile();
+      }
+      return [];
+    }
+  } else if (USE_FILES_FALLBACK) {
+    console.log('📁 Using file storage for search');
+    return loadBookmarksFromFile();
+  } else {
+    console.error('❌ No storage method available for search');
+    return [];
+  }
+}
+
+// Load bookmarks from file
+async function loadBookmarksFromFile(): Promise<Bookmark[]> {
   try {
     if (!existsSync(BOOKMARKS_FILE)) {
       return [];
@@ -79,7 +131,7 @@ async function loadBookmarks(): Promise<Bookmark[]> {
     const data = await readFile(BOOKMARKS_FILE, 'utf-8');
     return JSON.parse(data) as Bookmark[];
   } catch (error) {
-    console.error('Error loading bookmarks:', error);
+    console.error('Error loading bookmarks from file:', error);
     return [];
   }
 }
@@ -373,7 +425,7 @@ export async function GET(request: NextRequest) {
       visits: bookmark.visits || 0,
       lastVisited: bookmark.visits > 0 ? new Date(bookmark.created_at).toLocaleDateString() : 'Never',
       dateAdded: new Date(bookmark.created_at).toLocaleDateString(),
-      favicon: bookmark.title?.charAt(0)?.toUpperCase() || 'B',
+      favicon: (bookmark as any).favicon || (bookmark as any).custom_favicon || bookmark.title?.charAt(0)?.toUpperCase() || 'B',
       screenshot: "/placeholder.svg",
       circularImage: "/placeholder.svg",
       logo: "",
@@ -476,7 +528,7 @@ export async function POST(request: NextRequest) {
       visits: bookmark.visits || 0,
       lastVisited: bookmark.visits > 0 ? new Date(bookmark.created_at).toLocaleDateString() : 'Never',
       dateAdded: new Date(bookmark.created_at).toLocaleDateString(),
-      favicon: bookmark.title?.charAt(0)?.toUpperCase() || 'B',
+      favicon: (bookmark as any).favicon || (bookmark as any).custom_favicon || bookmark.title?.charAt(0)?.toUpperCase() || 'B',
       screenshot: "/placeholder.svg",
       circularImage: "/placeholder.svg",
       logo: "",

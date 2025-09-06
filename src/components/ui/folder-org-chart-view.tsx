@@ -557,7 +557,7 @@ export function FolderOrgChartView({
         colorName: newLevel.colorName,
         order: hierarchySections.length + 1
       };
-      
+
       setHierarchySections([...hierarchySections, newSection]);
       setShowAddLevel(false);
       setNewLevel({

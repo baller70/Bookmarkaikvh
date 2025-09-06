@@ -47,6 +47,7 @@ interface Priority {
 
 export default function PriorityPage() {
   const [priorities, setPriorities] = useState<Priority[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -60,76 +61,96 @@ export default function PriorityPage() {
   })
   const [filterLevel, setFilterLevel] = useState<'all' | '1' | '2' | '3' | '4' | '5'>('all')
 
-  // Load real priority data from bookmarks API
+  // Load real priority data from bookmarks API with enhanced analytics
   useEffect(() => {
     const loadRealPriorityData = async () => {
+      setLoading(true);
       try {
-        const response = await fetch('/api/bookmarks');
-        const data = await response.json();
-        
-        if (data.success && data.bookmarks) {
-          // Extract and analyze priorities from real bookmarks
+        // Fetch both bookmarks and analytics data
+        const [bookmarksResponse, analyticsResponse] = await Promise.all([
+          fetch('/api/bookmarks'),
+          fetch('/api/bookmarks/analytics').catch(() => ({ ok: false })) // Graceful fallback
+        ]);
+
+        const bookmarksData = await bookmarksResponse.json();
+        const analyticsData = analyticsResponse.ok ? await analyticsResponse.json() : null;
+
+        if (bookmarksData.success && bookmarksData.bookmarks) {
+          // Extract and analyze priorities from real bookmarks with enhanced metrics
           const priorityCounts: { [key: string]: number } = {};
-          
-          data.bookmarks.forEach((bookmark: any) => {
+          const priorityVisits: { [key: string]: number } = {};
+          const priorityLastUsed: { [key: string]: string } = {};
+
+          bookmarksData.bookmarks.forEach((bookmark: any) => {
             const priority = bookmark.priority || 'medium'; // Default to medium if not set
             priorityCounts[priority] = (priorityCounts[priority] || 0) + 1;
+
+            // Add analytics data if available
+            if (analyticsData?.data?.analytics) {
+              const bookmarkAnalytics = analyticsData.data.analytics.find((a: any) => a.id === bookmark.id);
+              if (bookmarkAnalytics) {
+                priorityVisits[priority] = (priorityVisits[priority] || 0) + (bookmarkAnalytics.visits || 0);
+                if (bookmarkAnalytics.last_visited && (!priorityLastUsed[priority] || bookmarkAnalytics.last_visited > priorityLastUsed[priority])) {
+                  priorityLastUsed[priority] = bookmarkAnalytics.last_visited;
+                }
+              }
+            }
           });
 
-          // Create priority entries based on real data
+          // Create priority entries based on real data with enhanced analytics
           const defaultPriorities: Priority[] = [
             {
               id: '1',
               name: 'Critical',
-              description: 'Highest priority items that need immediate attention',
+              description: `Highest priority items that need immediate attention (${priorityVisits['critical'] || 0} total visits)`,
               level: 5,
               color: '#EF4444',
               icon: 'alert-circle',
               bookmarkCount: priorityCounts['critical'] || 0,
               createdAt: '2024-01-15',
-              updatedAt: new Date().toISOString().split('T')[0],
+              updatedAt: priorityLastUsed['critical'] || new Date().toISOString().split('T')[0],
               isDefault: true
             },
             {
               id: '2',
               name: 'High',
-              description: 'Important items that should be addressed soon',
+              description: `Important items that should be addressed soon (${priorityVisits['high'] || 0} total visits)`,
               level: 4,
               color: '#F97316',
               icon: 'arrow-up',
               bookmarkCount: priorityCounts['high'] || 0,
               createdAt: '2024-01-10',
-              updatedAt: new Date().toISOString().split('T')[0],
+              updatedAt: priorityLastUsed['high'] || new Date().toISOString().split('T')[0],
               isDefault: true
             },
             {
               id: '3',
               name: 'Medium',
-              description: 'Standard priority for regular items',
+              description: `Standard priority for regular items (${priorityVisits['medium'] || 0} total visits)`,
               level: 3,
               color: '#3B82F6',
               icon: 'target',
               bookmarkCount: priorityCounts['medium'] || 0,
               createdAt: '2024-01-05',
-              updatedAt: new Date().toISOString().split('T')[0],
+              updatedAt: priorityLastUsed['medium'] || new Date().toISOString().split('T')[0],
               isDefault: true
             },
             {
               id: '4',
               name: 'Low',
-              description: 'Items that can be addressed when time permits',
+              description: `Items that can be addressed when time permits (${priorityVisits['low'] || 0} total visits)`,
               level: 2,
               color: '#10B981',
               icon: 'arrow-down',
               bookmarkCount: priorityCounts['low'] || 0,
               createdAt: '2024-01-12',
-              updatedAt: new Date().toISOString().split('T')[0],
+              updatedAt: priorityLastUsed['low'] || new Date().toISOString().split('T')[0],
               isDefault: true
             },
             {
               id: '5',
               name: 'Someday',
-              description: 'Items for future reference with no urgency',
+              description: `Items for future reference with no urgency (${priorityVisits['someday'] || 0} total visits)`,
               level: 1,
               color: '#6B7280',
               icon: 'clock',
@@ -194,7 +215,14 @@ export default function PriorityPage() {
         }
       } catch (error) {
         console.error('Error loading real priority data:', error);
+        toast({
+          title: "Error",
+          description: "Unable to load priority analytics. Please check your connection.",
+          variant: "destructive",
+        });
         setPriorities([]);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -386,7 +414,7 @@ export default function PriorityPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Manage Priorities</h2>
-              <p className="text-gray-600 dark:text-gray-400">Set priority levels for better bookmark organization</p>
+              <p className="text-gray-600 dark:text-gray-400">Set priority levels for better bookmark organization with real-time analytics</p>
             </div>
             
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -544,10 +572,32 @@ export default function PriorityPage() {
 
           {/* Priorities List */}
           <div className="space-y-4">
-            {sortedPriorities.map((priority) => {
-              const IconComponent = getIconComponent(priority.icon)
-              return (
-                <Card key={priority.id} className="hover:shadow-lg transition-shadow">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="text-gray-600 dark:text-gray-400">Loading priority analytics...</span>
+                </div>
+              </div>
+            ) : sortedPriorities.length === 0 ? (
+              <div className="text-center py-12">
+                <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No priorities found</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  {searchTerm ? 'No priorities match your search criteria.' : 'Create your first priority to get started.'}
+                </p>
+                {!searchTerm && (
+                  <Button onClick={() => setIsCreateDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Priority
+                  </Button>
+                )}
+              </div>
+            ) : (
+              sortedPriorities.map((priority) => {
+                const IconComponent = getIconComponent(priority.icon)
+                return (
+                  <Card key={priority.id} className="hover:shadow-lg transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
@@ -602,31 +652,11 @@ export default function PriorityPage() {
                       </div>
                     </div>
                   </CardHeader>
-                </Card>
-              )
-            })}
+                  </Card>
+                )
+              })
+            )}
           </div>
-
-          {filteredPriorities.length === 0 && (
-            <div className="text-center py-12">
-              <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                {searchTerm ? 'No priorities found' : 'No priorities yet'}
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                {searchTerm 
-                  ? 'Try adjusting your search terms' 
-                  : 'Create your first priority to organize your bookmarks'
-                }
-              </p>
-              {!searchTerm && (
-                <Button onClick={() => setIsCreateDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Priority
-                </Button>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

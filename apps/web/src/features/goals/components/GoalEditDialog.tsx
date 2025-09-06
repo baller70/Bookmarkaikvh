@@ -46,6 +46,7 @@ interface Goal {
   connected_bookmarks?: string[] // Array of bookmark IDs
   tags?: string[]
   notes?: string
+  folder_id?: string // Optional folder assignment
   created_at?: string
   updated_at?: string
 }
@@ -60,12 +61,21 @@ interface Bookmark {
   isFavorite?: boolean
 }
 
+interface GoalFolder {
+  id: string
+  name: string
+  description?: string
+  color: string
+}
+
 interface GoalEditDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   goal: Goal | null
   onSubmit: (goal: Goal) => void
   bookmarks: Bookmark[]
+  folders?: GoalFolder[]
+  selectedFolderId?: string
 }
 
 export const GoalEditDialog: React.FC<GoalEditDialogProps> = ({
@@ -73,7 +83,9 @@ export const GoalEditDialog: React.FC<GoalEditDialogProps> = ({
   onOpenChange,
   goal,
   onSubmit,
-  bookmarks
+  bookmarks,
+  folders = [],
+  selectedFolderId
 }) => {
   const [formData, setFormData] = useState<Goal>({
     id: '',
@@ -88,7 +100,8 @@ export const GoalEditDialog: React.FC<GoalEditDialogProps> = ({
     goal_progress: 0,
     connected_bookmarks: [],
     tags: [],
-    notes: ''
+    notes: '',
+    folder_id: selectedFolderId || undefined
   })
 
   const [selectedBookmarks, setSelectedBookmarks] = useState<string[]>([])
@@ -101,7 +114,8 @@ export const GoalEditDialog: React.FC<GoalEditDialogProps> = ({
       setFormData({
         ...goal,
         connected_bookmarks: goal.connected_bookmarks || [],
-        tags: goal.tags || []
+        tags: goal.tags || [],
+        folder_id: goal.folder_id || undefined
       })
       setSelectedBookmarks(goal.connected_bookmarks || [])
     } else {
@@ -119,11 +133,12 @@ export const GoalEditDialog: React.FC<GoalEditDialogProps> = ({
         goal_progress: 0,
         connected_bookmarks: [],
         tags: [],
-        notes: ''
+        notes: '',
+        folder_id: selectedFolderId || undefined
       })
       setSelectedBookmarks([])
     }
-  }, [goal])
+  }, [goal, selectedFolderId])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -262,11 +277,48 @@ export const GoalEditDialog: React.FC<GoalEditDialogProps> = ({
                   <Textarea
                     id="description"
                     placeholder="Describe your goal..."
-                    value={formData.description}
+                    value={formData.description || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                     rows={3}
                   />
                 </div>
+
+                {/* Folder Selection */}
+                {folders.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="folder">Folder (Optional)</Label>
+                    <Select
+                      value={formData.folder_id || 'none'}
+                      onValueChange={(value) => setFormData(prev => ({
+                        ...prev,
+                        folder_id: value === 'none' ? undefined : value
+                      }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a folder or leave unassigned" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-4 h-4 rounded bg-gray-300" />
+                            <span>No folder (unassigned)</span>
+                          </div>
+                        </SelectItem>
+                        {folders.map(folder => (
+                          <SelectItem key={folder.id} value={folder.id}>
+                            <div className="flex items-center space-x-2">
+                              <div
+                                className="w-4 h-4 rounded"
+                                style={{ backgroundColor: folder.color }}
+                              />
+                              <span>{folder.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Goal Type & Priority */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -357,7 +409,7 @@ export const GoalEditDialog: React.FC<GoalEditDialogProps> = ({
                   <Textarea
                     id="goal_description"
                     placeholder="Detailed description of what you want to achieve..."
-                    value={formData.goal_description}
+                    value={formData.goal_description || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, goal_description: e.target.value }))}
                     rows={3}
                   />
@@ -475,7 +527,7 @@ export const GoalEditDialog: React.FC<GoalEditDialogProps> = ({
                   <Textarea
                     id="notes"
                     placeholder="Additional notes, reminders, or details about this goal..."
-                    value={formData.notes}
+                    value={formData.notes || ''}
                     onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                     rows={4}
                   />

@@ -55,6 +55,7 @@ import {
   Target,
   BarChart3
 } from 'lucide-react'
+import { getFaviconUrl, getDomainFromUrl } from '@/lib/favicon-utils'
 
 interface BookmarkTimelineProps {
   bookmarks: any[]
@@ -223,8 +224,8 @@ function TimelineBookmarkCard({ bookmark, userDefaultLogo, onBookmarkClick, inde
               <div className="flex items-center space-x-3 flex-1">
                 {/* Favicon */}
                 <Avatar className="h-10 w-10 border-2 border-blue-200">
-                  <AvatarImage 
-                    src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+                  <AvatarImage
+                    src={getFaviconUrl(bookmark, 64)}
                     alt={bookmark.title}
                   />
                   <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xs font-bold">
@@ -729,8 +730,8 @@ function CreateCategoryDialog({ bookmarks, onCreateCategory, open, onOpenChange 
                         )}
                       </div>
                       <Avatar className="h-8 w-8">
-                        <AvatarImage 
-                          src={`https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}&sz=64`}
+                        <AvatarImage
+                          src={(bookmark as any).custom_favicon || bookmark.favicon || `https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}&sz=64`}
                           alt={bookmark.title}
                         />
                         <AvatarFallback className="text-xs">

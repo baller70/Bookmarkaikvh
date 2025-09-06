@@ -168,30 +168,25 @@ class SyncService {
       },
       bookmarks: mergedBookmarks,
       timestamp: new Date().toISOString(),
-      source: 'supabase'
+      source: 'merged'
     }
   }
 
+  // Merge bookmarks arrays, removing duplicates
   private mergeBookmarks(localBookmarks: any[], supabaseBookmarks: any[]): any[] {
     const bookmarkMap = new Map()
     
-    // Add Supabase bookmarks first (by user_id + url combination)
+    // Add Supabase bookmarks first
     supabaseBookmarks.forEach(bookmark => {
-      if (bookmark.url && bookmark.user_id) {
-        const key = `${bookmark.user_id}:${bookmark.url}`
-        bookmarkMap.set(key, bookmark)
+      if (bookmark.url) {
+        bookmarkMap.set(bookmark.url, bookmark)
       }
     })
     
-    // Add/override with local bookmarks (by user_id + url combination)
+    // Add/override with local bookmarks
     localBookmarks.forEach(bookmark => {
-      if (bookmark.url && bookmark.user_id) {
-        const key = `${bookmark.user_id}:${bookmark.url}`
-        const existing = bookmarkMap.get(key)
-        
-        if (!existing || new Date(bookmark.updated_at) > new Date(existing.updated_at)) {
-          bookmarkMap.set(key, bookmark)
-        }
+      if (bookmark.url) {
+        bookmarkMap.set(bookmark.url, bookmark)
       }
     })
     
@@ -355,7 +350,7 @@ class SyncService {
       const supabaseResult = await this.syncToSupabase({
         profileData,
         timestamp: new Date().toISOString(),
-        source: 'supabase'
+        source: 'quick-sync'
       })
 
       return {
@@ -405,4 +400,4 @@ export async function saveSyncDataFile(path: string, data: any): Promise<boolean
   }
 }
 
-export default SyncService.getInstance()    
+export default SyncService.getInstance() 

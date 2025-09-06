@@ -21,6 +21,11 @@ export interface Bookmark {
   visits?: number;
   time_spent?: number;
   relatedBookmarks?: number[];
+
+  // Custom uploads for individual bookmark customization
+  custom_favicon?: string;
+  custom_logo?: string;
+  custom_background?: string;
 }
 
 export interface BookmarkStorageOptions {

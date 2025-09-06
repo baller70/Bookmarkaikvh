@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase configuration
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+
+const USE_SUPABASE = !!(
+  supabaseUrl &&
+  supabaseKey &&
+  !supabaseKey.includes('dev-placeholder') &&
+  !supabaseUrl.includes('dev-placeholder')
+)
+
+const supabase = USE_SUPABASE ? createClient(supabaseUrl, supabaseKey) : null
+const USE_FILES_FALLBACK = true;
 
 interface Bookmark {
   id: string;
@@ -22,6 +37,18 @@ interface SearchResult {
   matchedFields: string[];
 }
 
+// Helper function to load bookmarks from file
+async function loadBookmarksFromFile(): Promise<Bookmark[]> {
+  try {
+    const bookmarksPath = path.join(process.cwd(), 'data', 'bookmarks.json');
+    const bookmarksData = await fs.readFile(bookmarksPath, 'utf-8');
+    return JSON.parse(bookmarksData);
+  } catch (error) {
+    console.error('Error loading bookmarks from file:', error);
+    return [];
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -37,14 +64,35 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Load bookmarks from file
-    const bookmarksPath = path.join(process.cwd(), 'data', 'bookmarks.json');
-    
+    // Load bookmarks from Supabase or file fallback
     let bookmarks: Bookmark[] = [];
-    try {
-      const bookmarksData = await fs.readFile(bookmarksPath, 'utf-8');
-      bookmarks = JSON.parse(bookmarksData);
-    } catch (error) {
+
+    if (USE_SUPABASE && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('bookmarks')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('❌ Supabase search error:', error);
+          if (USE_FILES_FALLBACK) {
+            bookmarks = await loadBookmarksFromFile();
+          }
+        } else {
+          bookmarks = data || [];
+        }
+      } catch (error) {
+        console.error('❌ Supabase connection error:', error);
+        if (USE_FILES_FALLBACK) {
+          bookmarks = await loadBookmarksFromFile();
+        }
+      }
+    } else if (USE_FILES_FALLBACK) {
+      bookmarks = await loadBookmarksFromFile();
+    }
+
+    if (bookmarks.length === 0) {
       return NextResponse.json({
         bookmarks: [],
         total: 0,

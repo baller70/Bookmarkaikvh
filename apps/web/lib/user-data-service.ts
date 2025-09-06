@@ -12,13 +12,13 @@ import {
   CreateUserCommentInput,
   ApiResponse,
   PaginatedResponse
-} from '../../../backend/types/database';
+} from '@/types/database';
 
 class UserDataService {
   private baseUrl = '/api/user-data';
 
   // Media Files
-  async uploadFile(file: File, type: 'image' | 'video' | 'audio' | 'document' | 'logo', tags?: string[]): Promise<UserMediaFile> {
+  async uploadFile(file: File, type: 'image' | 'video' | 'document' | 'logo', tags?: string[]): Promise<UserMediaFile> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('type', type);
@@ -316,4 +316,4 @@ class UserDataService {
 
 // Export a singleton instance
 export const userDataService = new UserDataService();
-export default userDataService;  
+export default userDataService; 

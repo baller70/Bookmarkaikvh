@@ -1,8 +1,6 @@
 import { openai } from './openai-client';
-import { appLogger } from '../logger';
+import { logger } from '../logger';
 // // import { performanceMonitor } from '../monitoring/performance-enhanced';
-
-const logger = appLogger;
 
 // Category hierarchy types
 export interface CategoryHierarchy {
@@ -223,28 +221,28 @@ class SmartCategorizationEngine {
     const startTime = Date.now();
     
     try {
-      console.log('Starting smart categorization', { title, url });
+      logger.info('Starting smart categorization', { title, url });
 
       // Combine all text for analysis
       const fullText = [title, description, content, tags?.join(' ')].filter(Boolean).join(' ');
 
-      // For now, skip AI-powered categorization and use pattern-based only
-      // const aiAnalysis = await this.getAICategorization(fullText, url);
+      // Get AI-powered categorization
+      const aiAnalysis = await this.getAICategorization(fullText, url);
       
       // Get pattern-based categorization
       const patternAnalysis = this.getPatternBasedCategorization(url, fullText);
       
-      // Use pattern analysis as the primary result
-      const finalAnalysis = this.formatPatternAnalysis(patternAnalysis);
+      // Combine and score results
+      const finalAnalysis = this.combineAnalyses(aiAnalysis, patternAnalysis);
       
       // Apply learning adjustments
       const adjustedAnalysis = this.applyLearningAdjustments(finalAnalysis);
       
       // Track performance
-//       // performanceMonitor.recordMetric('smart_categorization_duration', Date.now() - startTime);
-//       // performanceMonitor.recordMetric('categorization_confidence', adjustedAnalysis.confidence);
+//       performanceMonitor.recordMetric('smart_categorization_duration', Date.now() - startTime);
+//       performanceMonitor.recordMetric('categorization_confidence', adjustedAnalysis.confidence);
       
-      console.log('Smart categorization completed', {
+      logger.info('Smart categorization completed', {
         primaryCategory: adjustedAnalysis.primaryCategory.category,
         confidence: adjustedAnalysis.confidence,
         duration: Date.now() - startTime
@@ -253,7 +251,7 @@ class SmartCategorizationEngine {
       return adjustedAnalysis;
       
     } catch (error) {
-      console.error('Smart categorization failed', { error: error.message, title, url });
+      logger.error('Smart categorization failed', { error: error.message, title, url });
       
       // Fallback to pattern-based categorization
       const fallbackAnalysis = this.getPatternBasedCategorization(url, title);
@@ -324,7 +322,7 @@ Focus on accuracy, provide confidence scores, and suggest new subcategories if t
       const analysis = JSON.parse(response.choices[0].message.content);
       return this.validateAndNormalizeAnalysis(analysis);
     } catch (parseError) {
-      logger?.error('Failed to parse AI categorization response', { parseError });
+      logger.error('Failed to parse AI categorization response', { parseError });
       throw new Error('AI categorization parsing failed');
     }
   }
@@ -539,27 +537,6 @@ Focus on accuracy, provide confidence scores, and suggest new subcategories if t
     };
   }
 
-  // Format pattern analysis as full CategoryAnalysis
-  private formatPatternAnalysis(patternAnalysis: Partial<CategoryAnalysis>): CategoryAnalysis {
-    return {
-      primaryCategory: patternAnalysis.primaryCategory || {
-        category: 'uncategorized',
-        confidence: 0.3,
-        reasoning: 'Pattern-based categorization - no clear matches found',
-        hierarchy: [],
-        alternativeCategories: [],
-        subcategories: []
-      },
-      secondaryCategories: patternAnalysis.secondaryCategories || [],
-      hierarchyPath: patternAnalysis.hierarchyPath || [],
-      confidence: patternAnalysis.confidence || 0.3,
-      reasoning: patternAnalysis.primaryCategory?.reasoning || 'Pattern-based categorization using URL patterns and keywords',
-      suggestedSubcategories: [],
-      relatedCategories: [],
-      categoryTags: []
-    };
-  }
-
   // Format pattern analysis as fallback
   private formatAsFallback(patternAnalysis: Partial<CategoryAnalysis>): CategoryAnalysis {
     return {
@@ -613,7 +590,7 @@ Focus on accuracy, provide confidence scores, and suggest new subcategories if t
     this.learning.lastUpdated = new Date().toISOString();
     this.saveLearningData();
     
-    logger?.info('Learning from user correction', {
+    logger.info('Learning from user correction', {
       originalCategory,
       correctedCategory,
       url: urlPattern
@@ -634,29 +611,17 @@ Focus on accuracy, provide confidence scores, and suggest new subcategories if t
   private loadLearningData(): void {
     // This would load from a persistent storage in a real implementation
     // For now, we'll use in-memory storage
-    try {
-      logger?.info('Loading categorization learning data');
-    } catch (error) {
-      console.log('Loading categorization learning data');
-    }
+    logger.info('Loading categorization learning data');
   }
 
   // Save learning data to storage
   private saveLearningData(): void {
     // This would save to persistent storage in a real implementation
-    try {
-      logger?.info('Saving categorization learning data', {
-        corrections: Object.keys(this.learning.userCorrections).length,
-        patterns: Object.keys(this.learning.categoryPatterns).length,
-        adjustments: Object.keys(this.learning.confidenceAdjustments).length
-      });
-    } catch (error) {
-      console.log('Saving categorization learning data', {
-        corrections: Object.keys(this.learning.userCorrections).length,
-        patterns: Object.keys(this.learning.categoryPatterns).length,
-        adjustments: Object.keys(this.learning.confidenceAdjustments).length
-      });
-    }
+    logger.info('Saving categorization learning data', {
+      corrections: Object.keys(this.learning.userCorrections).length,
+      patterns: Object.keys(this.learning.categoryPatterns).length,
+      adjustments: Object.keys(this.learning.confidenceAdjustments).length
+    });
   }
 
   // Get category suggestions for a given text
@@ -672,7 +637,7 @@ Focus on accuracy, provide confidence scores, and suggest new subcategories if t
       return suggestions.slice(0, limit);
       
     } catch (error) {
-      logger?.error('Failed to get category suggestions', { error: error.message });
+      logger.error('Failed to get category suggestions', { error: error.message });
       return [];
     }
   }
@@ -705,4 +670,12 @@ Focus on accuracy, provide confidence scores, and suggest new subcategories if t
 }
 
 // Export singleton instance
-export const smartCategorization = new SmartCategorizationEngine();     
+export const smartCategorization = new SmartCategorizationEngine();
+
+// Export types
+export type {
+  CategoryHierarchy,
+  CategorySuggestion,
+  CategoryAnalysis,
+  CategoryLearning
+}; 

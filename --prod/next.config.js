@@ -3,15 +3,21 @@ const nextConfig = {
   reactStrictMode: process.env.NODE_ENV === 'production', // Enable in production
   pageExtensions: ['ts', 'tsx', 'js', 'jsx'],
   
-  // Environment variables with defaults for development
+  // SECURITY: Only expose public environment variables to client
   env: {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://kljhlubpxxcawacrzaix.supabase.co',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsamhsdWJweHhjYXdhY3J6YWl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTcxNjI2NzQsImV4cCI6MjAzMjczODY3NH0.dev-placeholder-key',
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsamhsdWJweHhjYXdhY3J6YWl4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcxNzE2MjY3NCwiZXhwIjoyMDMyNzM4Njc0fQ.dev-placeholder-service-key',
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY || 'sk-dev-placeholder-key',
-    BYPASS_AUTHENTICATION: process.env.BYPASS_AUTHENTICATION || 'true',
-    ENABLE_FILE_STORAGE_FALLBACK: process.env.ENABLE_FILE_STORAGE_FALLBACK || 'true',
-    REDIS_DISABLE: process.env.REDIS_DISABLE || 'true', // Default to disabled for stability
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    // SECURITY: Never expose service role keys, API keys, or auth bypass flags to client
+    // These are server-side only and should be accessed via process.env directly
+  },
+
+  // Server-side runtime configuration (not exposed to client)
+  serverRuntimeConfig: {
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    BYPASS_AUTHENTICATION: process.env.BYPASS_AUTHENTICATION,
+    ENABLE_FILE_STORAGE_FALLBACK: process.env.ENABLE_FILE_STORAGE_FALLBACK,
+    REDIS_DISABLE: process.env.REDIS_DISABLE
   },
   
   // Remove standalone output for Vercel

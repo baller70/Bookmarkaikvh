@@ -14,6 +14,12 @@ const audiowide = Audiowide({
 export const metadata = {
   title: 'BookAIMark',
   description: 'AI-powered bookmark management platform',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
+  },
+  manifest: '/manifest.json',
 }
 
 export default function RootLayout({

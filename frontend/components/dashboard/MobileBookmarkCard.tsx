@@ -26,6 +26,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useSwipeActions, useTouchGestures } from '@/hooks/use-touch-gestures'
 import { useDeviceInfo } from '@/hooks/use-mobile'
+import { getFaviconUrl, handleFaviconError } from '@/lib/favicon-utils'
 
 interface Bookmark {
   id: number
@@ -179,7 +180,7 @@ export function MobileBookmarkCard({
           <div className="flex items-start gap-3 mb-3">
             {/* Favicon */}
             <Avatar className="h-10 w-10 flex-shrink-0">
-              <AvatarImage src={bookmark.favicon} alt="" />
+              <AvatarImage src={getFaviconUrl(bookmark, 40)} alt="" />
               <AvatarFallback className="text-xs bg-slate-100 dark:bg-slate-800">
                 {bookmark.title.charAt(0).toUpperCase()}
               </AvatarFallback>
@@ -428,7 +429,7 @@ export function MobileCompactBookmarkCard({
       >
         {/* Favicon */}
         <Avatar className="h-8 w-8 flex-shrink-0">
-          <AvatarImage src={bookmark.favicon} alt="" />
+          <AvatarImage src={getFaviconUrl(bookmark, 32)} alt="" />
           <AvatarFallback className="text-xs bg-slate-100 dark:bg-slate-800">
             {bookmark.title.charAt(0).toUpperCase()}
           </AvatarFallback>

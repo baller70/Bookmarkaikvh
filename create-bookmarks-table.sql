@@ -19,7 +19,12 @@ CREATE TABLE IF NOT EXISTS public.bookmarks (
     customBackground TEXT,
     visits INTEGER DEFAULT 0,
     time_spent INTEGER DEFAULT 0,
-    relatedBookmarks INTEGER[] DEFAULT ARRAY[]::INTEGER[]
+    relatedBookmarks INTEGER[] DEFAULT ARRAY[]::INTEGER[],
+
+    -- Custom uploads for individual bookmark customization
+    custom_favicon TEXT,
+    custom_logo TEXT,
+    custom_background TEXT
 );
 
 -- Create indexes for performance

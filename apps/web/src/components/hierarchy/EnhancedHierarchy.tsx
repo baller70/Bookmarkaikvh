@@ -224,16 +224,30 @@ function SortableFolderItem({ folder, level, onAssignToLevel, showLevelSelector 
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    console.log('Edit folder:', folder.name);
+                    alert(`Edit folder: ${folder.name}`);
+                  }}>
                     <Edit2 className="h-4 w-4 mr-2" />
                     Edit Folder
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    console.log('Configure folder:', folder.name);
+                    alert(`Configure folder: ${folder.name}`);
+                  }}>
                     <Settings className="h-4 w-4 mr-2" />
                     Configure
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-red-600">
+                  <DropdownMenuItem
+                    className="text-red-600"
+                    onClick={() => {
+                      console.log('Remove folder:', folder.name);
+                      if (confirm(`Are you sure you want to remove ${folder.name}?`)) {
+                        alert(`Remove folder: ${folder.name}`);
+                      }
+                    }}
+                  >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Remove
                   </DropdownMenuItem>
@@ -337,12 +351,15 @@ function DroppableSection({
                   <Edit2 className="h-4 w-4 mr-2" />
                   Edit Title
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  console.log('Configure section:', section.title);
+                  alert(`Configure section: ${section.title}`);
+                }}>
                   <Settings className="h-4 w-4 mr-2" />
                   Configure
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => onDeleteSection(section.id)}
                   className="text-red-600"
                 >

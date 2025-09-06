@@ -61,6 +61,53 @@ export const KHV1InfinityBoard = ({
   onHierarchyAssignmentsChange: (assignments: FolderHierarchyAssignment[]) => void
 }) => {
   const [transform, setTransform] = useState({ x: 0, y: 0, zoom: 1 })
+
+  // Handler functions for folder operations
+  const handleEditFolder = (folder: any) => {
+    console.log('Edit folder:', folder)
+    // TODO: Implement folder editing modal
+    alert(`Edit folder: ${folder.name}`)
+  }
+
+  const handleDeleteFolder = (folderId: string) => {
+    console.log('Delete folder:', folderId)
+    // TODO: Implement folder deletion with confirmation
+    if (confirm('Are you sure you want to delete this folder?')) {
+      alert(`Delete folder: ${folderId}`)
+    }
+  }
+
+  const handleAddBookmarkToFolder = (folderId: string) => {
+    console.log('Add bookmark to folder:', folderId)
+    // Use the existing onAddBookmark handler
+    onAddBookmark()
+  }
+
+  const handleDropBookmarkToFolder = (bookmarkId: string, folderId: string) => {
+    console.log('Drop bookmark to folder:', { bookmarkId, folderId })
+    // TODO: Implement bookmark moving logic
+    alert(`Move bookmark ${bookmarkId} to folder ${folderId}`)
+  }
+
+  const handleBookmarkUpdated = (bookmark: any) => {
+    console.log('Bookmark updated:', bookmark)
+    // TODO: Implement bookmark update logic
+  }
+
+  const handleBookmarkDeleted = (bookmarkId: string) => {
+    console.log('Bookmark deleted:', bookmarkId)
+    // TODO: Implement bookmark deletion logic
+    if (confirm('Are you sure you want to delete this bookmark?')) {
+      alert(`Delete bookmark: ${bookmarkId}`)
+    }
+  }
+
+  const handleFolderNavigate = (folderId: string) => {
+    console.log('Navigate to folder:', folderId)
+    // TODO: Implement folder navigation
+    alert(`Navigate to folder: ${folderId}`)
+  }
+
   if (!isActive) return null
 
   return (
@@ -112,15 +159,15 @@ export const KHV1InfinityBoard = ({
               folders={folders}
               bookmarks={bookmarks}
               onCreateFolder={onCreateFolder}
-              onEditFolder={() => {}}
-              onDeleteFolder={() => {}}
-              onAddBookmarkToFolder={() => {}}
-              onDropBookmarkToFolder={() => {}}
-              onBookmarkUpdated={() => {}}
-              onBookmarkDeleted={() => {}}
+              onEditFolder={handleEditFolder}
+              onDeleteFolder={handleDeleteFolder}
+              onAddBookmarkToFolder={handleAddBookmarkToFolder}
+              onDropBookmarkToFolder={handleDropBookmarkToFolder}
+              onBookmarkUpdated={handleBookmarkUpdated}
+              onBookmarkDeleted={handleBookmarkDeleted}
               onOpenDetail={onOpenDetail}
               currentFolderId={null}
-              onFolderNavigate={() => {}}
+              onFolderNavigate={handleFolderNavigate}
               selectedFolder={null}
               onAddBookmark={onAddBookmark}
               hierarchyAssignments={folderAssignments}

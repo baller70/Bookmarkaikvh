@@ -19,6 +19,7 @@ import {
 import { MediaLibrary } from './MediaLibrary';
 import { DocumentEditor } from './DocumentEditor';
 import { useMediaLibrary } from '../hooks/useMediaLibrary';
+import { formatDate } from '../utils';
 
 type ActiveView = 'library' | 'document';
 
@@ -173,7 +174,12 @@ export function MediaHub() {
           </TabsContent>
 
           <TabsContent value="documents" className="flex-1 m-0">
-            <MediaLibrary onDocumentOpen={handleDocumentOpen} initialFilterType="document" />
+            <MediaLibrary
+              onDocumentOpen={handleDocumentOpen}
+              initialFilterType="document"
+              showCreateDocumentButton={true}
+              onCreateDocument={handleCreateNewDocument}
+            />
           </TabsContent>
         </Tabs>
       </div>

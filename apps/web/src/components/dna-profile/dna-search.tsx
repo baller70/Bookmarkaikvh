@@ -200,26 +200,62 @@ export default function DnaSearch() {
     if (!query.trim()) return
 
     setIsSearching(true)
-    
-    // Simulate API call
-    setTimeout(() => {
-      setResults(mockResults.filter(result => 
-        result.title.toLowerCase().includes(query.toLowerCase()) ||
-        result.content.toLowerCase().includes(query.toLowerCase()) ||
-        result.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase()))
-      ))
-      setIsSearching(false)
-      
-      // Add to history
-      const historyItem: SearchHistory = {
-        id: Date.now().toString(),
-        query,
-        timestamp: new Date(),
-        resultCount: mockResults.length,
-        filters: { ...filters }
+
+    try {
+      // Build search parameters
+      const params = new URLSearchParams({
+        query: query,
+        limit: '20',
+        offset: '0'
+      })
+
+      // Add filters if they exist
+      if (filters.categories && filters.categories.length > 0) {
+        params.append('category', filters.categories[0]) // Use first category for now
       }
-      setSearchHistory(prev => [historyItem, ...prev.slice(0, 9)])
-    }, 1000)
+
+      // Call the real search API
+      const response = await fetch(`/api/bookmarks/search?${params}`)
+
+      if (response.ok) {
+        const data = await response.json()
+
+        // Transform API results to match the expected format
+        const transformedResults = (data.bookmarks || []).map((bookmark: any) => ({
+          id: bookmark.id.toString(),
+          title: bookmark.title,
+          content: bookmark.description || bookmark.ai_summary || 'No description available',
+          url: bookmark.url,
+          tags: [...(bookmark.tags || []), ...(bookmark.ai_tags || [])],
+          category: bookmark.category || bookmark.ai_category || 'General',
+          relevance: bookmark.relevance_score || 0.8,
+          timestamp: new Date(bookmark.created_at || Date.now()),
+          favicon: bookmark.favicon,
+          ai_summary: bookmark.ai_summary,
+          notes: bookmark.notes
+        }))
+
+        setResults(transformedResults)
+
+        // Add to history
+        const historyItem: SearchHistory = {
+          id: Date.now().toString(),
+          query,
+          timestamp: new Date(),
+          resultCount: transformedResults.length,
+          filters: { ...filters }
+        }
+        setSearchHistory(prev => [historyItem, ...prev.slice(0, 9)])
+      } else {
+        console.error('Search failed:', response.statusText)
+        setResults([])
+      }
+    } catch (error) {
+      console.error('Search error:', error)
+      setResults([])
+    } finally {
+      setIsSearching(false)
+    }
   }
 
   const handleAIAssist = (suggestion: string) => {

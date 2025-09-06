@@ -238,21 +238,12 @@ export function FavoritesPage({ userId }: FavoritesPageProps) {
     const newStatus = !bookmark.is_favorite
     try {
       const raw = bookmark.__raw
-      const response = await fetch('/api/bookmarks', {
-        method: 'POST',
+      const response = await fetch(`/api/bookmarks/${raw.id}/favorite`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: raw.id,
-          title: raw.title,
-          url: raw.url,
-          description: raw.description || '',
-          category: raw.category || 'General',
-          tags: Array.isArray(raw.tags) ? raw.tags : [],
-          notes: raw.notes || '',
-          ai_summary: raw.ai_summary || '',
-          ai_tags: Array.isArray(raw.ai_tags) ? raw.ai_tags : [],
-          ai_category: raw.ai_category || raw.category || 'General',
-          isFavorite: newStatus
+          isFavorite: newStatus,
+          user_id: 'dev-user-123'
         })
       })
       const result = await response.json()

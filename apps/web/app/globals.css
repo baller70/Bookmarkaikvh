@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 body {
-  background-color: transparent !important;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
 @layer base {

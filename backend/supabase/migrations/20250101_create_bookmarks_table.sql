@@ -9,6 +9,11 @@ CREATE TABLE IF NOT EXISTS public.user_bookmarks (
     description TEXT,
     favicon TEXT,
     screenshot TEXT,
+
+    -- Custom uploads for individual bookmark customization
+    custom_favicon TEXT,
+    custom_logo TEXT,
+    custom_background TEXT,
     
     -- Categorization
     category TEXT,

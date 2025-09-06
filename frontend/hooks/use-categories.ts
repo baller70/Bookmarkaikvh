@@ -220,7 +220,7 @@ export function useCategories(userId: string = 'dev-user-123') {
         body: JSON.stringify({
           ...categoryData,
           user_id: userId,
-          parent_id: categoryData.parent_id || null
+          parent_id: categoryData.parent_id && categoryData.parent_id !== 'none' ? categoryData.parent_id : null
         })
       });
 
