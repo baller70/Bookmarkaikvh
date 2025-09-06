@@ -1,16 +1,45 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { writeFile, readFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import { join } from 'path';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+// File-based storage for hierarchy sections
+const HIERARCHY_SECTIONS_FILE = join(process.cwd(), 'data', 'hierarchy-sections.json');
+
+// Ensure data directory exists
+async function ensureDataDirectory() {
+  const dataDir = join(process.cwd(), 'data');
+  if (!existsSync(dataDir)) {
+    await mkdir(dataDir, { recursive: true });
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
     console.log('📖 Fetching hierarchy sections...');
 
-    // Always return default sections for now since this is a UI component
-    // that doesn't need user-specific customization for Goal 2.0 folders
-    console.log('📝 Returning default hierarchy sections');
+    // Try to read from saved file first
+    if (existsSync(HIERARCHY_SECTIONS_FILE)) {
+      try {
+        console.log('📂 Reading hierarchy sections from file...');
+        const fileContent = await readFile(HIERARCHY_SECTIONS_FILE, 'utf8');
+        const savedData = JSON.parse(fileContent);
+
+        if (savedData.hierarchySections && Array.isArray(savedData.hierarchySections)) {
+          console.log(`✅ Loaded ${savedData.hierarchySections.length} hierarchy sections from file`);
+          return NextResponse.json({ hierarchySections: savedData.hierarchySections });
+        }
+      } catch (fileError) {
+        console.warn('⚠️ Error reading hierarchy sections file, falling back to defaults:', fileError);
+      }
+    }
+
+    // Fall back to default sections
+    console.log('📝 Using default hierarchy sections');
     const defaultSections = [
       {
         id: 'director',
@@ -68,12 +97,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For now, just return success without saving to database
-    // since we're using default sections for the Goal 2.0 feature
-    console.log(`✅ Received ${hierarchySections.length} hierarchy sections (not saving - using defaults)`);
+    console.log(`📝 Saving ${hierarchySections.length} hierarchy sections to file storage...`);
+
+    // Ensure data directory exists
+    await ensureDataDirectory();
+
+    // Save to file storage
+    const dataToSave = {
+      hierarchySections: hierarchySections,
+      lastUpdated: new Date().toISOString(),
+      version: '1.0'
+    };
+
+    await writeFile(HIERARCHY_SECTIONS_FILE, JSON.stringify(dataToSave, null, 2), 'utf8');
+    console.log(`✅ Successfully saved ${hierarchySections.length} hierarchy sections to ${HIERARCHY_SECTIONS_FILE}`);
+
     return NextResponse.json({
-      message: 'Hierarchy sections received successfully (using defaults)',
-      hierarchySections: hierarchySections
+      message: 'Hierarchy sections saved successfully',
+      hierarchySections: hierarchySections,
+      saved: true
     });
 
   } catch (error) {
