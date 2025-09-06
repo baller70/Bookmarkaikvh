@@ -359,15 +359,18 @@ export function FolderOrgChartView({
     }
   };
 
-  // Initialize hierarchy assignments from folders
+  // Initialize hierarchy assignments from folders (only when folders change significantly)
   useEffect(() => {
-    const assignments: FolderHierarchyAssignment[] = folders.map(folder => ({
-      folderId: folder.id,
-      level: 'collaborators' as const,
-      order: 0,
-    }));
-    setHierarchyAssignments(assignments);
-  }, [folders]);
+    // Only update if we don't have assignments or folder count changed
+    if (hierarchyAssignments.length !== folders.length) {
+      const assignments: FolderHierarchyAssignment[] = folders.map(folder => ({
+        folderId: folder.id,
+        level: 'collaborators' as const,
+        order: 0,
+      }));
+      setHierarchyAssignments(assignments);
+    }
+  }, [folders.length, hierarchyAssignments.length]); // Only depend on length, not full folders array
 
   // Filter and sort folders based on current criteria
   const filteredAndSortedFolders = useMemo(() => {
@@ -612,22 +615,29 @@ export function FolderOrgChartView({
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                     }}
                     className="h-8 w-8 p-0 hover:bg-gray-100"
+                    onMouseDown={(e) => e.stopPropagation()}
                   >
                     <Settings className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenuItem 
+                <DropdownMenuContent
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       if (onAddBookmark) {
                         onAddBookmark();
                       } else {
                         onAddBookmarkToFolder(folder.id);
                       }
                     }}
+                    onMouseDown={(e) => e.stopPropagation()}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Bookmark
@@ -838,24 +848,38 @@ export function FolderOrgChartView({
   // Handle adding a new hierarchy level
   const handleAddLevel = async () => {
     if (newLevel.title.trim()) {
-      const newSection = {
-        id: newLevel.title.toLowerCase().replace(/\s+/g, '-'),
-        title: newLevel.title,
-        iconName: newLevel.iconName,
-        colorName: newLevel.colorName,
-        order: (managedHierarchySections?.length || 0) + 1
-      };
+      console.log('🔧 Adding new hierarchy level:', newLevel);
 
-      // Add to managed sections through the API handler
-      const updatedSections = [...(managedHierarchySections || []), newSection];
-      await handleHierarchySectionsChange(updatedSections);
+      try {
+        const newSection = {
+          id: newLevel.title.toLowerCase().replace(/\s+/g, '-'),
+          title: newLevel.title,
+          iconName: newLevel.iconName,
+          colorName: newLevel.colorName,
+          order: (managedHierarchySections?.length || 0) + 1
+        };
 
-      setShowAddLevel(false);
-      setNewLevel({
-        title: '',
-        iconName: 'Users',
-        colorName: 'blue'
-      });
+        console.log('🔧 New section created:', newSection);
+
+        // Add to managed sections through the API handler
+        const updatedSections = [...(managedHierarchySections || []), newSection];
+        console.log('🔧 Updated sections:', updatedSections);
+
+        await handleHierarchySectionsChange(updatedSections);
+        console.log('✅ Hierarchy sections updated successfully');
+
+        setShowAddLevel(false);
+        setNewLevel({
+          title: '',
+          iconName: 'Users',
+          colorName: 'blue'
+        });
+      } catch (error) {
+        console.error('❌ Error adding hierarchy level:', error);
+        // Don't close the modal on error so user can retry
+      }
+    } else {
+      console.warn('⚠️ Cannot add level: title is empty');
     }
   };
 

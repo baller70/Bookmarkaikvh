@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import ReactFlow, {
   ReactFlowProvider,
   Background,
@@ -61,6 +61,20 @@ export const KHV1InfinityBoard = ({
   onHierarchyAssignmentsChange: (assignments: FolderHierarchyAssignment[]) => void
 }) => {
   const [transform, setTransform] = useState({ x: 0, y: 0, zoom: 1 })
+  const transformRef = useRef({ x: 0, y: 0, zoom: 1 })
+
+  // Use useCallback to prevent infinite re-renders
+  const handleMove = useCallback((_, viewport) => {
+    // Update ref immediately for transform calculations
+    transformRef.current = { x: viewport.x, y: viewport.y, zoom: viewport.zoom }
+
+    // Debounce state updates to prevent infinite loops
+    const timeoutId = setTimeout(() => {
+      setTransform({ x: viewport.x, y: viewport.y, zoom: viewport.zoom })
+    }, 16) // ~60fps
+
+    return () => clearTimeout(timeoutId)
+  }, [])
 
   // Handler functions for folder operations
   const handleEditFolder = (folder: any) => {
@@ -130,9 +144,7 @@ export const KHV1InfinityBoard = ({
             minZoom={0.1}
             maxZoom={4}
             defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-            onMove={(_, viewport) => {
-              setTransform({ x: viewport.x, y: viewport.y, zoom: viewport.zoom })
-            }}
+            onMove={handleMove}
           >
             <Background gap={12} color="#e5e7eb" />
             <Controls position="bottom-right" />
