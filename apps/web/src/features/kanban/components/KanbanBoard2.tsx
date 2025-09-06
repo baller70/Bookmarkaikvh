@@ -633,7 +633,11 @@ function CardEditDialog({ card, open, onOpenChange, onSave }: {
 
   useEffect(() => {
     if (card) {
-      setFormData(card)
+      // Ensure priority is never empty string to prevent Select component error
+      setFormData({
+        ...card,
+        priority: card.priority && card.priority.trim() !== '' ? card.priority : 'medium'
+      })
     } else {
       setFormData({
         id: Date.now().toString(),
