@@ -5190,11 +5190,16 @@ export default function Dashboard() {
                   ) : (
                     categories
                       .filter((category) => category.name && category.name.trim() !== '')
-                      .map((category) => (
-                        <SelectItem key={category.id || category.name} value={category.name.toLowerCase()}>
-                          {category.name}
-                        </SelectItem>
-                      ))
+                      .map((category) => {
+                        const categoryValue = category.name.trim().toLowerCase();
+                        // Ensure value is never empty string
+                        const safeValue = categoryValue || 'uncategorized';
+                        return (
+                          <SelectItem key={category.id || category.name} value={safeValue}>
+                            {category.name}
+                          </SelectItem>
+                        );
+                      })
                   )}
                 </SelectContent>
               </Select>
