@@ -5188,11 +5188,13 @@ export default function Dashboard() {
                   {isLoadingCategories ? (
                     <SelectItem value="loading" disabled>Loading categories...</SelectItem>
                   ) : (
-                    categories.map((category) => (
-                      <SelectItem key={category.id || category.name} value={category.name.toLowerCase()}>
-                        {category.name}
-                      </SelectItem>
-                    ))
+                    categories
+                      .filter((category) => category.name && category.name.trim() !== '')
+                      .map((category) => (
+                        <SelectItem key={category.id || category.name} value={category.name.toLowerCase()}>
+                          {category.name}
+                        </SelectItem>
+                      ))
                   )}
                 </SelectContent>
               </Select>
